@@ -1,5 +1,4 @@
 <div align="center">
-<img width="240" src="./asset/ppcube.png" alt="ppcube" />
 <br />
 <img align="center" src="https://img.shields.io/badge/status-desenvolvimento-green.svg" alt="Status" />
 <hr/>
