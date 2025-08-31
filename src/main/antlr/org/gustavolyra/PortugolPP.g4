@@ -17,13 +17,19 @@ declaracao
     | chamadaFuncao ';'
     | bloco
     | expressao ';'
-    | declaracaoReturn
+    | declaracaoRetornar
     | declaracaoEnquanto
     | declaracaoPara
     | declaracaoFacaEnquanto
     | declaracaoQuebra
     | declaracaoContinue
     | declaracaoInterface
+    | declaracaoTentarCapturar
+    ;
+
+
+declaracaoTentarCapturar
+    : 'tentar' bloco ('capturar' bloco)?
     ;
 
 
@@ -60,8 +66,8 @@ declaracaoSe
     : 'se' '(' expressao ')' declaracao ('senao' declaracao)?
     ;
 
-declaracaoReturn
-    : 'return' expressao? ';'
+declaracaoRetornar
+    : 'retornar' expressao? ';'
     ;
 
 declaracaoClasse

@@ -1,6 +1,5 @@
 package org.gustavolyra.portugolpp
 
-import avaliarArgumento
 import models.Ambiente
 import models.Valor
 import models.enums.BASIC_TYPES.Companion.buscarValorOuJogarException
@@ -35,7 +34,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         setFuncoes(global)
     }
 
-    override fun visitImportarDeclaracao(ctx: ImportarDeclaracaoContext): Valor? {
+    override fun visitImportarDeclaracao(ctx: ImportarDeclaracaoContext): Valor {
         val nomeArquivo = ctx.TEXTO_LITERAL().text.removeSurrounding("\"")
         processarImport(nomeArquivo)
         return Valor.Nulo
@@ -149,16 +148,24 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
+    override fun visitDeclaracaoTentarCapturar(ctx: DeclaracaoTentarCapturarContext?): Valor? {
+        try {
+            visit(ctx?.bloco(0))
+        } catch (_: Exception) {
+            visit(ctx?.bloco(1))
+        }
+        return Valor.Nulo
+    }
+
+
     override fun visitDeclaracaoClasse(ctx: DeclaracaoClasseContext): Valor {
         val nomeClasse = ctx.ID(0).text
         var superClasse: String?
 
         if (ctx.childCount > 3 && ctx.getChild(2).text == "estende") {
             superClasse = ctx.getChild(3).text
-            val classeBase = global.obterClasse(superClasse)
-            if (classeBase == null) {
-                throw RuntimeException("Classe base '$superClasse' não encontrada para a classe '$nomeClasse'")
-            }
+            global.obterClasse(superClasse)
+                ?: throw RuntimeException("Classe base '$superClasse' não encontrada para a classe '$nomeClasse'")
         }
         val interfaces = mutableListOf<String>()
         var implementaIndex = -1
@@ -176,10 +183,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 val token = ctx.getChild(i).text
                 if (token != "," && token != "implementa") {
                     interfaces.add(token)
-                    val interfaceDecl = global.obterInterface(token)
-                    if (interfaceDecl == null) {
-                        throw RuntimeException("Interface '$token' não encontrada")
-                    }
+                    global.obterInterface(token) ?: throw RuntimeException("Interface '$token' não encontrada")
 
                     if (!verificarImplementacaoInterface(ctx, token)) {
                         throw RuntimeException("A classe '$nomeClasse' não implementa todos os métodos da interface '$token'")
@@ -265,7 +269,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     }
 
     //TODO: refatorar vist para declaracao de return
-    override fun visitDeclaracaoReturn(ctx: DeclaracaoReturnContext): Valor {
+    override fun visitDeclaracaoRetornar(ctx: DeclaracaoRetornarContext): Valor {
         val valorRetorno = ctx.expressao()?.let { visit(it) } ?: Valor.Nulo
 
         if (funcaoAtual != null && funcaoAtual!!.tipoRetorno != null) {
@@ -1067,11 +1071,9 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 if (match != null) {
                     val nomeClasse = match.groupValues[1]
 
-                    val classe = global.obterClasse(nomeClasse)
-                    if (classe == null) {
-                        throw RuntimeException("Classe não encontrada: $nomeClasse")
-                    }
-                    return criarObjetoClasse(nomeClasse, ctx)
+                    val classe =
+                        global.obterClasse(nomeClasse) ?: throw RuntimeException("Classe não encontrada: $nomeClasse")
+                    return criarObjetoClasse(nomeClasse, ctx, classe)
                 } else {
                     throw RuntimeException("Sintaxe inválida para criação de objeto")
                 }
@@ -1083,19 +1085,14 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
+    //TODO: testar mais essa funcao de extracao argumentos do constructor..., testei apenas com tipos simples... e com objetos?
     private fun extrairArgumentosDoConstructor(ctx: PrimarioContext): List<Valor> {
         val args = mutableListOf<Valor>()
-        if (ctx.childCount > 2 && ctx.getChild(ctx.getChildCount() - 2).text == "(") {
-            val argText = ctx.getChild(ctx.getChildCount() - 1).text
-            if (argText != ")" && argText.isNotEmpty()) {
-                val argumentos = argText.split(",")
-                for (arg in argumentos) {
-                    val valor = avaliarArgumento(arg.trim(), ambiente)
-                    args.add(valor)
-                }
+        if (!ctx.argumentos().isEmpty) {
+            ctx.argumentos().expressao().forEach { expr ->
+                args.add(visit(expr))
             }
         }
-
         return args
     }
 
@@ -1120,9 +1117,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
-    private fun criarObjetoClasse(nomeClasse: String, ctx: PrimarioContext): Valor {
-        val classe = global.obterClasse(nomeClasse) ?: throw RuntimeException("Classe não encontrada: $nomeClasse")
-
+    private fun criarObjetoClasse(nomeClasse: String, ctx: PrimarioContext, classe: DeclaracaoClasseContext): Valor {
         val superClasse = global.getSuperClasse(classe)
         val interfaces = global.getInterfaces(classe)
 
@@ -1146,7 +1141,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             val argumentos = extrairArgumentosDoConstructor(ctx)
             executarMetodo(objeto, inicializarMetodo, argumentos)
         }
-
         return objeto
     }
 }

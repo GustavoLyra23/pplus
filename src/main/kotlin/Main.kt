@@ -45,13 +45,12 @@ fun executarArquivo(caminho: String) {
     }
 }
 
-//TODO: pensar em uma forma melhor de usar essa funcao...
+/**TODO: pensar em uma forma melhor de usar essa funcao...
 //fun mostrarAjuda() {
 //    println("Uso do Portugol++ CLI:")
 //    println("  Sem argumentos   - Iniciar modo interativo REPL")
 //    println("  run <arquivo>    - Executar um arquivo Portugol++")
-//}
-
+}*/
 
 fun executarPortugolPP(codigo: String) {
     try {

@@ -22,6 +22,17 @@ fun setFuncoes(global: Ambiente) {
         Valor.Nulo
     })
 
+    global.definir("jogarError", Valor.Funcao("jogarError", null) { args ->
+        if (args.isEmpty()) {
+            throw RuntimeException("Função jogarError requer um argumento (mensagem de erro)")
+        }
+        val mensagem = args[0]
+        if (mensagem !is Valor.Texto) {
+            throw RuntimeException("Argumento deve ser um texto (mensagem de erro)")
+        }
+        throw RuntimeException(mensagem.valor)
+    })
+
     //TODO: rever implementacao das threads
     global.definir("executar", Valor.Funcao("executar", null) { args ->
         if (args.isEmpty() || args[0] !is Valor.Funcao) {
@@ -74,6 +85,7 @@ fun setFuncoes(global: Ambiente) {
         Valor.Nulo
     })
 
+    //TODO: tirar isso de c++ e passar pra kotlin
     global.definir("lerArquivo", Valor.Funcao("lerArquivo", null) { args ->
         if (args.isEmpty()) throw RuntimeException("Função lerArquivo requer um argumento (caminho do arquivo)")
         if (args.size > 1) throw RuntimeException("Função lerArquivo aceita apenas um argumento")
@@ -146,6 +158,7 @@ fun setFuncoes(global: Ambiente) {
 
         val lista = args[0]
         val indice = args[1]
+
 
         if (lista !is Valor.Lista) {
             throw RuntimeException("Primeiro argumento deve ser uma lista")
