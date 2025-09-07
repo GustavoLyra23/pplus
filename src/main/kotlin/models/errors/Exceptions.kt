@@ -1,4 +1,4 @@
-package org.gustavolyra.portugolpp
+package models.errors
 
 import models.Valor
 

@@ -58,6 +58,7 @@ fun comparar(operador: String, esquerda: Valor, direita: Valor): Valor {
     }
 }
 
+//TODO: implementar comparação para listas e mapas
 fun saoIguais(esquerda: Valor, direita: Valor): Boolean {
     return when {
         esquerda is Valor.Inteiro && direita is Valor.Inteiro -> esquerda.valor == direita.valor

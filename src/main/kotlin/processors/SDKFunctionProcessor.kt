@@ -3,7 +3,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import models.Ambiente
 import models.Valor
-import org.gustavolyra.portugolpp.ArquivoException
+import models.errors.ArquivoException
 import processors.FileIOProcessor.escreverArquivo
 import processors.FileIOProcessor.lerArquivo
 import java.util.*

@@ -2,7 +2,7 @@ package models.enums
 
 import models.Valor
 
-enum class BASIC_TYPES(val tipo: String) {
+enum class BasicTypes(val tipo: String) {
     INTEIRO("Inteiro"),
     REAL("Real"),
     TEXTO("Texto"),
@@ -10,15 +10,15 @@ enum class BASIC_TYPES(val tipo: String) {
     Nulo("Nulo");
 
     companion object {
-        fun buscarTipo(tipo: String): BASIC_TYPES? {
+        fun buscarTipo(tipo: String): BasicTypes? {
             return entries.find { it.tipo == tipo }
         }
 
-        fun buscarTipoOuJogarException(tipo: String): BASIC_TYPES {
+        fun buscarTipoOuJogarException(tipo: String): BasicTypes {
             return buscarTipo(tipo) ?: throw IllegalArgumentException("Tipo não encontrado: $tipo")
         }
 
-        fun buscarValorOuJogarException(tipo: Valor): BASIC_TYPES {
+        fun buscarValorOuJogarException(tipo: Valor): BasicTypes {
             return when (tipo) {
                 is Valor.Texto -> TEXTO
                 is Valor.Inteiro -> INTEIRO

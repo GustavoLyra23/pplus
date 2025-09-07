@@ -2,8 +2,12 @@ package org.gustavolyra.portugolpp
 
 import models.Ambiente
 import models.Valor
-import models.enums.BASIC_TYPES.Companion.buscarValorOuJogarException
+import models.enums.BasicTypes.Companion.buscarValorOuJogarException
 import models.enums.LOOP
+import models.errors.BreakException
+import models.errors.ContinueException
+import models.errors.MainExecutionException
+import models.errors.RetornoException
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.gustavolyra.portugolpp.PortugolPPParser.*
@@ -37,9 +41,9 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     override fun visitImportarDeclaracao(ctx: ImportarDeclaracaoContext): Valor {
         val nomeArquivo = ctx.TEXTO_LITERAL().text.removeSurrounding("\"")
         processarImport(nomeArquivo)
+        print("falaGalera");
         return Valor.Nulo
     }
-
 
     private fun processarDeclaracoesDoArquivo(tree: ProgramaContext) {
         tree.declaracao().forEach { declaracao ->
@@ -69,17 +73,16 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
 
     fun processarImport(nomeArquivo: String) {
-        val caminhoCompleto = nomeArquivo
-        println("caminhoCompleto -> $caminhoCompleto")
-        if (arquivosImportados.contains(caminhoCompleto)) {
+        println("caminhoCompleto -> $nomeArquivo")
+        if (arquivosImportados.contains(nomeArquivo)) {
             println("Arquivo ja importado...")
             return
         }
 
-        arquivosImportados.add(caminhoCompleto)
+        arquivosImportados.add(nomeArquivo)
 
         try {
-            val conteudo = File(caminhoCompleto).readText()
+            val conteudo = File(nomeArquivo).readText()
             val lexer = PortugolPPLexer(CharStreams.fromString(conteudo))
             val tokens = CommonTokenStream(lexer)
             val parser = PortugolPPParser(tokens)
