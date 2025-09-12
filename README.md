@@ -1,12 +1,10 @@
-<div align="center">
-<br />
-<img align="center" src="https://img.shields.io/badge/status-desenvolvimento-green.svg" alt="Status" />
-<hr/>
-</div>
-
 ## Sobre o Projeto
+
 _P++_ é uma linguagem de programação destinada a falantes de português, facilitando o aprendizado de programação através
 de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens orientadas a objetos.
+
+
+<img src="./asset/terminal.gif" style="height: 350px"/>
 
 ## Características
 
@@ -31,7 +29,8 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 
 - **Documentação da Engine do Interpretador**: [P++ Docs](https://deepwiki.com/GustavoLyra23/PPlus)
 - **Site Oficial do _P++_**: [Web Page](https://gustavolyra23.github.io/pplus_web/index.html)
-- **Extensão Vscode**: [_P++_ Vscode Extension](https://marketplace.visualstudio.com/items?itemName=gustavomirandalyra16.portugolpp)
+- **Extensão Vscode**: [
+  _P++_ Vscode Extension](https://marketplace.visualstudio.com/items?itemName=gustavomirandalyra16.portugolpp)
 
 ## Instalação
 
@@ -81,6 +80,10 @@ java -jar build/libs/portugolpp.jar programa.ppp
 ```bash
 ./portugolpp.exe programa.ppp
 ```
+
+<div>
+<img src="https://img.shields.io/badge/status-desenvolvimento-green.svg" alt="Status" />
+</div>
 
 
 

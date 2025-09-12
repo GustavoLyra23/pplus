@@ -1088,7 +1088,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
-    //TODO: testar mais essa funcao de extracao argumentos do constructor..., testei apenas com tipos simples... e com objetos?
+    //TODO: testar mais essa funcao de extracao argumentos do constructor..., ja testei com tipos simples e com objetos
     private fun extrairArgumentosDoConstructor(ctx: PrimarioContext): List<Valor> {
         val args = mutableListOf<Valor>()
         if (!ctx.argumentos().isEmpty) {
