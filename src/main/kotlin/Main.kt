@@ -45,7 +45,7 @@ fun executarArquivo(caminho: String) {
     }
 }
 
-/**TODO: pensar em uma forma melhor de usar essa funcao...
+/**TODO: pensar em uma melhor forma de usar essa funcao...
 //fun mostrarAjuda() {
 //    println("Uso do Portugol++ CLI:")
 //    println("  Sem argumentos   - Iniciar modo interativo REPL")
