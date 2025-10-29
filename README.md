@@ -25,8 +25,6 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 ## Documentação
 
 - **Documentação da Engine do Interpretador**: [P++ Docs](https://deepwiki.com/GustavoLyra23/PPlus)
-- **Extensão Vscode**: [
-  _P++_ Vscode Extension](https://marketplace.visualstudio.com/items?itemName=gustavomirandalyra16.portugolpp)
 
 ## Instalação
 
