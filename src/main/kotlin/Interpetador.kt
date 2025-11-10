@@ -2,7 +2,6 @@ package org.gustavolyra.portugolpp
 
 import models.Ambiente
 import models.Valor
-import models.enums.BasicTypes.Companion.buscarValorOuJogarException
 import models.enums.LOOP
 import models.errors.BreakException
 import models.errors.ContinueException
@@ -41,7 +40,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     override fun visitImportarDeclaracao(ctx: ImportarDeclaracaoContext): Valor {
         val nomeArquivo = ctx.TEXTO_LITERAL().text.removeSurrounding("\"")
         processarImport(nomeArquivo)
-        print("falaGalera");
         return Valor.Nulo
     }
 
@@ -110,7 +108,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             tree.declaracao().forEach { visit(it) }
             visitFuncaoMain()
         } catch (e: Exception) {
-            println("Erro durante a execução: ${e.message}")
+            println(e)
         }
     }
 
@@ -211,7 +209,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                     throw RuntimeException("Tipo de variável '$tipo' não corresponde ao tipo do objeto '$nomeClasse'")
                 }
             } else {
-                buscarValorOuJogarException(valor);
+                if (tipo != valor.getTypeString()) throw RuntimeException("Tipo da variavel nao corresponde ao tipo correto atribuido.")
             }
         }
         ambiente.definir(nome, valor)
@@ -603,10 +601,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         var i = 1
 
         while (i < ctx.childCount) {
-            if (resultado == Valor.Nulo) {
-                return Valor.Nulo
-            }
-
+            if (resultado == Valor.Nulo) return Valor.Nulo
             if (ctx.getChild(i).text == ".") {
                 val id = ctx.getChild(i + 1).text
 

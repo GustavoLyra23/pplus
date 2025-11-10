@@ -56,9 +56,6 @@ shadowJar {
     manifest {
         attributes 'Main-Class': 'MainKt'
     }
-    from("${layout.buildDirectory.get()}/resources/main/native") {
-        into("native")
-    }
 }
 
 launch4j {
@@ -72,41 +69,4 @@ launch4j {
 
 tasks.named('launch4j') {
     dependsOn shadowJar
-}
-
-def nativeBuildDir = file("${layout.buildDirectory.get()}/native")
-
-tasks.register("buildNative") {
-    doLast {
-        nativeBuildDir.mkdirs()
-        exec {
-            workingDir nativeBuildDir
-            commandLine "cmake", "${projectDir}", "-DCMAKE_BUILD_TYPE=Release"
-        }
-
-        exec {
-            workingDir nativeBuildDir
-            if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
-                commandLine "cmake", "--build", ".", "--config", "Release"
-            } else {
-                commandLine "cmake", "--build", "."
-            }
-        }
-    }
-}
-
-tasks.register("copyNativeLib", Copy) {
-    dependsOn "buildNative"
-    from {
-        if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
-            fileTree(dir: nativeBuildDir, include: ["**/Release/portugolpp.dll", "**/portugolpp.dll"])
-        } else {
-            fileTree(dir: nativeBuildDir, include: ["**/libportugolpp.so"])
-        }
-    }
-    into("${layout.buildDirectory.get()}/resources/main/native")
-}
-
-tasks.named("processResources") {
-    dependsOn("copyNativeLib")
 }

@@ -8,6 +8,7 @@ import processors.FileIOProcessor.escreverArquivo
 import processors.FileIOProcessor.lerArquivo
 import java.util.*
 
+// Native pdk functions
 fun setFuncoes(global: Ambiente) {
 
     global.definir("escrever", Valor.Funcao("escrever", null) { args ->
@@ -147,7 +148,6 @@ fun setFuncoes(global: Ambiente) {
         for (i in 1 until args.size) {
             lista.elementos.add(args[i])
         }
-
         lista
     })
 

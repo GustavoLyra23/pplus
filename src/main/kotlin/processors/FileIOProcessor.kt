@@ -2,12 +2,25 @@ package processors
 
 object FileIOProcessor {
 
-    init {
-        System.loadLibrary("portugolpp")
-        println("Consegui ler lib nativa")
+    // ler arquivo como String
+    fun lerArquivo(path: String): String {
+        return try {
+            java.io.File(path).readText()
+        } catch (e: Exception) {
+            throw RuntimeException("Erro ao ler o arquivo: $path", e)
+        }
     }
-
-    //funcoes nativas em c++...
-    external fun lerArquivo(path: String): String
-    external fun escreverArquivo(path: String, data: String, append: Boolean = false)
+    
+    fun escreverArquivo(path: String, data: String, append: Boolean = false) {
+        try {
+            val file = java.io.File(path)
+            if (append) {
+                file.appendText(data)
+            } else {
+                file.writeText(data)
+            }
+        } catch (e: Exception) {
+            throw RuntimeException("Erro ao escrever no arquivo: $path", e)
+        }
+    }
 }
