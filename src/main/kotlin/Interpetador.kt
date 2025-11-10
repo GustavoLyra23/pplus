@@ -7,7 +7,6 @@ import models.errors.*
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.gustavolyra.portugolpp.PortugolPPParser.*
-import processarResultado
 import processors.comparar
 import processors.processarAdicao
 import processors.processarMultiplicacao
@@ -202,11 +201,11 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         if (tipo != null) {
             if (valor is Valor.Objeto) {
                 val nomeClasse = valor.klass
-                if (tipo != nomeClasse && valor.superClasse != tipo && !valor.interfaces.contains(tipo)) {
-                    throw SemanticError("Tipo de variável '$tipo' não corresponde ao tipo do objeto '$nomeClasse'")
-                }
+                if (tipo != nomeClasse && valor.superClasse != tipo && !valor.interfaces.contains(tipo)) throw SemanticError(
+                    "Tipo de variável '$tipo' não corresponde ao tipo do objeto '$nomeClasse'"
+                )
             } else {
-                if (tipo != valor.getTypeString()) throw SemanticError("Tipo da variavel nao corresponde ao tipo correto atribuido.")
+                if (tipo != valor.typeString()) throw SemanticError("Tipo da variavel nao corresponde ao tipo correto atribuido.")
             }
         }
         ambiente.definir(nome, valor)
@@ -216,27 +215,40 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     override fun visitDeclaracaoFuncao(ctx: DeclaracaoFuncaoContext): Valor {
         val nome = ctx.ID().text
         val tipoRetorno = ctx.tipo()?.text
-        if (retornoFuncaoInvalido(tipoRetorno)) {
-            throw SemanticError("Tipo de retorno inválido: $tipoRetorno")
-        }
+        if (retornoFuncaoInvalido(tipoRetorno)) throw SemanticError("Tipo de retorno inválido: $tipoRetorno")
 
-        val implementacao: (List<Valor>, Ambiente) -> Valor = { argumentos, ambienteGlobal ->
+        ambiente.definir(
+            nome, Valor.Funcao(
+                nome = nome,
+                declaracao = ctx,
+                tipoRetorno = tipoRetorno,
+                implementacao = definirImplementacao(ctx, nome)
+            )
+        )
+        return Valor.Nulo
+    }
+
+    private fun definirImplementacao(
+        ctx: DeclaracaoFuncaoContext, nome: String
+    ): (List<Valor>, Ambiente) -> Valor {
+        return { argumentos, ambienteGlobal ->
             val numParamsDeclarados = ctx.listaParams()?.param()?.size ?: 0
             if (argumentos.size > numParamsDeclarados) {
                 throw SemanticError("Função '$nome' recebeu ${argumentos.size} parâmetros, mas espera $numParamsDeclarados")
             }
 
             val funcaoAmbiente = Ambiente(ambienteGlobal)
-
             ctx.listaParams()?.param()?.forEachIndexed { i, param ->
-                if (i < argumentos.size) {
-                    funcaoAmbiente.definir(param.ID().text, argumentos[i])
-                }
+                if (i < argumentos.size) funcaoAmbiente.definir(param.ID().text, argumentos[i])
             }
 
             val ambienteAnterior = ambiente
             ambiente = funcaoAmbiente
-
+            val funcao = Valor.Funcao(
+                ctx.ID().text, ctx, ctx.tipo()?.text
+            )
+            val funcaoAnterior = funcaoAtual
+            funcaoAtual = funcao
             try {
                 visit(ctx.bloco())
                 Valor.Nulo
@@ -244,35 +256,26 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 retorno.valor
             } finally {
                 ambiente = ambienteAnterior
+                funcaoAtual = funcaoAnterior
             }
         }
-
-        ambiente.definir(
-            nome, Valor.Funcao(
-                nome = nome,
-                // Manter para debug/reflexão
-                declaracao = ctx, tipoRetorno = tipoRetorno, implementacao = implementacao
-            )
-        )
-        return Valor.Nulo
     }
-
 
     //TODO: refatorar validacao...
     private fun retornoFuncaoInvalido(tipoRetorno: String?): Boolean {
         if (tipoRetorno == null) return false
         return tipoRetorno !in listOf(
-            "Inteiro", "Real", "Texto", "Logico", "Nulo"
+            "Inteiro", "Real", "Texto", "Logico", "Nulo", "Lista", "Mapa"
         ) && (global.obterClasse(tipoRetorno) == null && global.obterInterface(tipoRetorno) == null)
     }
 
     //TODO: refatorar vist para declaracao de return
     override fun visitDeclaracaoRetornar(ctx: DeclaracaoRetornarContext): Valor {
         val valorRetorno = ctx.expressao()?.let { visit(it) } ?: Valor.Nulo
-
+        // apenas valida se estivermos dentro de uma funcao
         if (funcaoAtual != null && funcaoAtual!!.tipoRetorno != null) {
             val tipoEsperado = funcaoAtual!!.tipoRetorno
-            val tipoAtual = processarResultado(valorRetorno)
+            val tipoAtual = valorRetorno.typeString()
             if (tipoEsperado != tipoAtual) {
                 if (valorRetorno is Valor.Objeto) {
                     //TODO: colocar verificao de superclasses e interfaces...
@@ -280,10 +283,9 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                         valorRetorno
                     )
                 }
-                throw SemanticError("Erro de tipo: função '${funcaoAtual!!.nome}' deve retornar '$tipoEsperado', mas está retornando '$tipoAtual'")
+                throw SemanticError("Erro de tipo: funcao '${funcaoAtual!!.nome}' deve retornar '$tipoEsperado', mas esta retornando '$tipoAtual'")
             }
         }
-
         throw RetornoException(valorRetorno)
     }
 
@@ -415,10 +417,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
         val propriedade = ctx.ID().text
 
-        val valor = objeto.campos[propriedade]
-        if (valor == null) {
-            return Valor.Nulo
-        }
+        val valor = objeto.campos[propriedade] ?: return Valor.Nulo
         return valor
     }
 
@@ -567,19 +566,13 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     private fun buscarMetodoNaHierarquia(objeto: Valor.Objeto, nomeMetodo: String): DeclaracaoFuncaoContext? {
         val classe = global.obterClasse(objeto.klass) ?: return null
         val metodo = classe.declaracaoFuncao().find { it.ID().text == nomeMetodo }
-
-        if (metodo != null) {
-            return metodo
-        }
-
+        if (metodo != null) return metodo
         if (objeto.superClasse != null) {
             val classeBase = global.obterClasse(objeto.superClasse) ?: return null
             val metodoBase = classeBase.declaracaoFuncao().find { it.ID().text == nomeMetodo }
-
             if (metodoBase != null) {
                 return metodoBase
             }
-
             val superClasseDaBase = global.getSuperClasse(classeBase)
             if (superClasseDaBase != null) {
                 val objetoBase = Valor.Objeto(objeto.superClasse, mutableMapOf(), superClasseDaBase)
@@ -591,10 +584,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     //TODO: diminuir complexidade
     override fun visitChamada(ctx: ChamadaContext): Valor {
-        if (ctx.acessoArray() != null) {
-            return visit(ctx.acessoArray())
-        }
-
+        if (ctx.acessoArray() != null) return visit(ctx.acessoArray())
         var resultado = visit(ctx.primario())
         var i = 1
 
@@ -636,7 +626,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
         return resultado
     }
-
 
     override fun visitDeclaracaoEnquanto(ctx: DeclaracaoEnquantoContext): Valor {
         var iteracoes = 0
@@ -863,89 +852,59 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     }
 
     override fun visitChamadaFuncao(ctx: ChamadaFuncaoContext): Valor {
+        //TODO: implementar validacao dos tipos dos parametros
         val argumentos = ctx.argumentos()?.expressao()?.map { visit(it) } ?: emptyList()
-
+        val funcName = ctx.ID().text
         return if (ctx.primario() != null) {
             val objeto = visit(ctx.primario())
-
-            if (objeto !is Valor.Objeto) {
-                throw SemanticError("Chamada de método em não-objeto")
-            }
-
-            val metodoNome = ctx.ID().text
-
+            if (objeto !is Valor.Objeto) throw SemanticError("Chamada de método em não-objeto")
             val classe =
                 global.obterClasse(objeto.klass) ?: throw SemanticError("Classe não encontrada: ${objeto.klass}")
-            val metodo = classe.declaracaoFuncao().find { it.ID().text == metodoNome }
-                ?: throw SemanticError("Método não encontrado: $metodoNome")
-
+            val metodo = classe.declaracaoFuncao().find { it.ID().text == funcName }
+                ?: throw SemanticError("Método não encontrado: $funcName")
             executarMetodo(objeto, metodo, argumentos)
         } else {
-            val funcaoNome = ctx.ID().text
-            chamadaFuncao(funcaoNome, argumentos)
+            chamadaFuncao(funcName, argumentos)
         }
     }
 
-    //TODO: diminuir complexidade
+    private fun Valor.compativelCom(expected: String): Boolean = when (this) {
+        is Valor.Objeto -> typeString() == expected || superClasse == expected || interfaces.contains(expected)
+
+        else -> typeString() == expected
+    }
+
+    private fun validarRetorno(nome: String, tipoEsperado: String?, resultado: Valor) {
+        if (tipoEsperado == null) return
+        if (resultado.compativelCom(tipoEsperado)) return
+        throw SemanticError(
+            "Erro de tipo: função '$nome' deve retornar '$tipoEsperado', mas retornou '${resultado.typeString()}'"
+        )
+    }
+
+    private fun resolverFuncao(nome: String): Valor.Funcao =
+        runCatching { ambiente.obter(nome) as? Valor.Funcao }.getOrNull()
+            ?: throw SemanticError("Função não encontrada ou não é função: $nome")
+
     private fun chamadaFuncao(nome: String, argumentos: List<Valor>): Valor {
         ambiente.thisObjeto?.let { obj ->
             buscarMetodoNaHierarquia(obj, nome)?.let { ctx ->
-                return executarMetodo(obj, ctx, argumentos)
+                return executarMetodo(
+                    obj, ctx, argumentos
+                )
             }
         }
 
-        val funcao = try {
-            val value = ambiente.obter(nome)
-            value as? Valor.Funcao ?: throw SemanticError("'$nome' não é uma função")
-        } catch (e: Exception) {
-            throw SemanticError("Função não encontrada: $nome + ${e.message}")
-        }
+        val funcao = resolverFuncao(nome)
+        return when (val cb = funcao.metodoCallback) {
+            null -> funcao.implementacao?.invoke(argumentos, ambiente)
+                ?: throw SemanticError("Função '$nome' não possui implementação.")
 
-        if (funcao.metodoCallback == null) {
-            val numParamsDeclarados = funcao.declaracao?.listaParams()?.param()?.size ?: 0
-            if (argumentos.size > numParamsDeclarados) {
-                throw SemanticError("Função '$nome' recebeu ${argumentos.size} parâmetros, mas espera $numParamsDeclarados")
+            else -> cb(argumentos).also { resultado ->
+                validarRetorno(nome, funcao.tipoRetorno, resultado)
             }
         }
 
-        val funcaoAnterior = funcaoAtual
-        funcaoAtual = funcao
-
-        //TODO: verificar tipo de retorno antes de executar a funcao..???
-        try {
-            if (funcao.metodoCallback != null) {
-                val resultado = funcao.metodoCallback.invoke(argumentos)
-                if (funcao.tipoRetorno != null) {
-                    val tipoEsperado = funcao.tipoRetorno
-                    val tipoAtual = processarResultado(resultado)
-                    if (tipoEsperado != tipoAtual) {
-                        if (resultado is Valor.Objeto) {
-                            if (resultado.superClasse == tipoEsperado || resultado.interfaces.contains(tipoEsperado)) return resultado
-                        }
-                        throw SemanticError("Erro de tipo: função '$nome' deve retornar '$tipoEsperado', mas está retornando '$tipoAtual'")
-                    }
-                }
-                return resultado
-            } else {
-                val decl = funcao.declaracao ?: throw SemanticError("Declaração de função não disponível: $nome")
-                val funcaoAmbiente = Ambiente(global)
-                decl.listaParams()?.param()?.forEachIndexed { i, param ->
-                    if (i < argumentos.size) funcaoAmbiente.definir(param.ID().text, argumentos[i])
-                }
-                val oldAmbiente = ambiente
-                ambiente = funcaoAmbiente
-                try {
-                    visit(decl.bloco())
-                    return Valor.Nulo
-                } catch (retorno: RetornoException) {
-                    return retorno.valor
-                } finally {
-                    ambiente = oldAmbiente
-                }
-            }
-        } finally {
-            funcaoAtual = funcaoAnterior
-        }
     }
 
 
@@ -961,7 +920,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         funcaoAtual = funcao
 
         val params = metodo.listaParams()?.param() ?: listOf()
-
         for (i in params.indices) {
             val paramNome = params[i].ID().text
 
@@ -987,7 +945,39 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
-    //TODO: diminuir complexidade
+    private fun resolverIdPrimario(ctx: PrimarioContext): Valor {
+        val nome = ctx.ID().text
+        if (ctx.childCount > 1 && ctx.getChild(1).text == "(") {
+            val argumentos = if (ctx.childCount > 2 && ctx.getChild(2) is ArgumentosContext) {
+                val argsCtx = ctx.getChild(2) as ArgumentosContext
+                argsCtx.expressao().map { visit(it) }
+            } else {
+                emptyList()
+            }
+            return chamadaFuncao(nome, argumentos)
+        } else {
+            try {
+                return ambiente.obter(nome)
+            } catch (e: Exception) {
+                throw e
+            }
+        }
+    }
+
+    private fun resolverClassePrimario(ctx: PrimarioContext): Valor {
+        val match = Regex("novo([A-Za-z0-9_]+)\\(.*\\)").find(ctx.text)
+        if (match != null) {
+            val nomeClasse = match.groupValues[1]
+
+            val classe =
+                global.obterClasse(nomeClasse) ?: throw SemanticError("Classe não encontrada: $nomeClasse")
+            return criarObjetoClasse(nomeClasse, ctx, classe)
+        } else {
+            throw SemanticError("Sintaxe inválida para criação de objeto")
+        }
+    }
+
+
     override fun visitPrimario(ctx: PrimarioContext): Valor {
         return when {
             ctx.listaLiteral() != null -> visit(ctx.listaLiteral())
@@ -997,45 +987,13 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                     it.toInt()
                 )
             }
-
             ctx.TEXTO_LITERAL() != null -> Valor.Texto(ctx.TEXTO_LITERAL().text.removeSurrounding("\""))
-            ctx.ID() != null && !ctx.text.startsWith("nova") -> {
-                val nome = ctx.ID().text
-                if (ctx.childCount > 1 && ctx.getChild(1).text == "(") {
-                    val argumentos = if (ctx.childCount > 2 && ctx.getChild(2) is ArgumentosContext) {
-                        val argsCtx = ctx.getChild(2) as ArgumentosContext
-                        argsCtx.expressao().map { visit(it) }
-                    } else {
-                        emptyList()
-                    }
-
-                    chamadaFuncao(nome, argumentos)
-                } else {
-                    try {
-                        ambiente.obter(nome)
-                    } catch (e: Exception) {
-                        throw e
-                    }
-                }
-            }
-
+            ctx.ID() != null && !ctx.text.startsWith("novo") -> resolverIdPrimario(ctx);
             ctx.expressao() != null -> visit(ctx.expressao())
             ctx.text == "verdadeiro" -> Valor.Logico(true)
             ctx.text == "falso" -> Valor.Logico(false)
             ctx.text == "this" -> ambiente.thisObjeto ?: throw SemanticError("'this' fora de contexto de objeto")
-            ctx.text.startsWith("nova") -> {
-                val match = Regex("nova([A-Za-z0-9_]+)\\(.*\\)").find(ctx.text)
-                if (match != null) {
-                    val nomeClasse = match.groupValues[1]
-
-                    val classe =
-                        global.obterClasse(nomeClasse) ?: throw SemanticError("Classe não encontrada: $nomeClasse")
-                    return criarObjetoClasse(nomeClasse, ctx, classe)
-                } else {
-                    throw SemanticError("Sintaxe inválida para criação de objeto")
-                }
-            }
-
+            ctx.text.startsWith("novo") -> resolverClassePrimario(ctx)
             else -> {
                 Valor.Nulo
             }

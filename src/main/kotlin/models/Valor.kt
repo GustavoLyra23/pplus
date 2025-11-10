@@ -43,16 +43,18 @@ sealed class Valor {
 
     object Nulo : Valor()
 
-    fun getTypeString(): String = when (this) {
-        is Inteiro -> BasicTypes.INTEIRO.toString()
-        is Real -> BasicTypes.REAL.toString()
-        is Texto -> BasicTypes.TEXTO.toString()
-        is Logico -> BasicTypes.LOGICO.toString()
+    fun typeString(): String = when (this) {
+        is Inteiro -> BasicTypes.INTEIRO.tipo
+        is Real -> BasicTypes.REAL.tipo
+        is Texto -> BasicTypes.TEXTO.tipo
+        is Logico -> BasicTypes.LOGICO.tipo
         is Objeto -> klass
         is Funcao -> nome
         is Interface -> nome
+        is Lista -> "Lista"
+        is Mapa -> "Mapa"
         //TODO: rever else case
-        else -> BasicTypes.Nulo.toString()
+        else -> BasicTypes.Nulo.tipo
     }
 
     override fun toString(): String = when (this) {

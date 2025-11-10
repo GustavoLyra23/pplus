@@ -86,7 +86,6 @@ fun setFuncoes(global: Ambiente) {
         Valor.Nulo
     })
 
-    //TODO: tirar isso de c++ e passar pra kotlin
     global.definir("lerArquivo", Valor.Funcao("lerArquivo", null) { args ->
         if (args.isEmpty()) throw RuntimeException("Função lerArquivo requer um argumento (caminho do arquivo)")
         if (args.size > 1) throw RuntimeException("Função lerArquivo aceita apenas um argumento")
@@ -215,22 +214,6 @@ fun setFuncoes(global: Ambiente) {
 
         Valor.Logico(mapa.elementos.containsKey(chave))
     })
-}
-
-fun processarResultado(resultado: Valor): String {
-    val tipoAtual = when (resultado) {
-        is Valor.Inteiro -> "Inteiro"
-        is Valor.Real -> "Real"
-        is Valor.Texto -> "Texto"
-        is Valor.Logico -> "Logico"
-        is Valor.Objeto -> resultado.klass
-        is Valor.Funcao -> "Funcao"
-        Valor.Nulo -> "Nulo"
-        is Valor.Interface -> TODO()
-        is Valor.Lista -> TODO()
-        is Valor.Mapa -> TODO()
-    }
-    return tipoAtual
 }
 
 

@@ -173,7 +173,7 @@ primario
     | ID ('(' argumentos? ')')?
     | 'this'
     | '(' expressao ')'
-    | 'nova' ID '(' argumentos? ')'
+    | 'novo' ID '(' argumentos? ')'
     | listaLiteral
     | mapaLiteral
     ;

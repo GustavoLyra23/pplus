@@ -1,0 +1,15 @@
+funcao teste(a: Inteiro): Inteiro {
+    escrever(a);
+    retornar 4;
+}
+
+classe A {
+    funcao gus() {
+       escrever("Gustavo");
+    }
+}
+
+var a = teste(3);
+var g = novo A();
+g.gus();
+escrever(a);
