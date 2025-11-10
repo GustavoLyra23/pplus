@@ -1,5 +1,6 @@
 package models
 
+import models.enums.BasicTypes
 import org.gustavolyra.portugolpp.PortugolPPParser
 
 sealed class Valor {
@@ -43,15 +44,15 @@ sealed class Valor {
     object Nulo : Valor()
 
     fun getTypeString(): String = when (this) {
-        is Inteiro -> "Inteiro"
-        is Real -> "Real"
-        is Texto -> "Texto"
-        is Logico -> "Logico"
+        is Inteiro -> BasicTypes.INTEIRO.toString()
+        is Real -> BasicTypes.REAL.toString()
+        is Texto -> BasicTypes.TEXTO.toString()
+        is Logico -> BasicTypes.LOGICO.toString()
         is Objeto -> klass
         is Funcao -> nome
         is Interface -> nome
         //TODO: rever else case
-        else -> "nulo"
+        else -> BasicTypes.Nulo.toString()
     }
 
     override fun toString(): String = when (this) {
