@@ -735,40 +735,23 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
-    //TODO: diminuir complexidade
+
     override fun visitDeclaracaoFacaEnquanto(ctx: DeclaracaoFacaEnquantoContext): Valor {
-        var limit = 0
+        var iter = 0
         do {
             try {
                 visit(ctx.declaracao())
-            } catch (e: RetornoException) {
-                throw e
             } catch (_: BreakException) {
                 break
             } catch (_: ContinueException) {
-                val condicao = visit(ctx.expressao())
-                if (condicao !is Valor.Logico) {
-                    throw SemanticError("Condição do 'enquanto' deve ser um valor lógico")
-                }
-                if (!condicao.valor) {
-                    break
-                }
-                visit(ctx.declaracao())
-                continue
+                // apenas pula...
             }
-
-            val condicao = visit(ctx.expressao())
-
-            if (condicao !is Valor.Logico) {
-                throw SemanticError("Condição do 'enquanto' deve ser um valor lógico")
-            }
-
-            if (!condicao.valor) {
-                break
-            }
-            limit++
-            if (limit >= 100) {
-                println("Aviso: Loop infinito detectado! Saindo do loop.")
+            val c = visit(ctx.expressao())
+            val logicRes =
+                (c as? Valor.Logico)?.valor ?: throw SemanticError("Condição do 'enquanto' deve ser um valor lógico")
+            if (!logicRes) break
+            if (++iter >= 100) {
+                println("Loop infinito detectado! Saindo do loop.")
                 break
             }
         } while (true)
