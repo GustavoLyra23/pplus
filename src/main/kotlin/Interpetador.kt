@@ -155,7 +155,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
-
+    //TODO: diminuir complexidade
     override fun visitDeclaracaoClasse(ctx: DeclaracaoClasseContext): Valor {
         val nomeClasse = ctx.ID(0).text
         var superClasse: String?
@@ -307,7 +307,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     override fun visitExpressao(ctx: ExpressaoContext): Valor = visit(ctx.getChild(0))
 
-    //TODO: tipos primitivos nao tem validacao, posso associar um `var a: Inteiro = "ab"`
+    //TODO: diminuir complexidade
     override fun visitAtribuicao(ctx: AtribuicaoContext): Valor {
         if (ctx.logicaOu() != null) {
             return visit(ctx.logicaOu())
@@ -589,6 +589,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return null
     }
 
+    //TODO: diminuir complexidade
     override fun visitChamada(ctx: ChamadaContext): Valor {
         if (ctx.acessoArray() != null) {
             return visit(ctx.acessoArray())
@@ -675,6 +676,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
+    //TODO: diminuir complexidade
     fun verificarImplementacaoInterface(classeContext: DeclaracaoClasseContext, nomeInterface: String): Boolean {
         val interfaceContext = global.obterInterface(nomeInterface) ?: return false
         for (assinatura in interfaceContext.assinaturaMetodo()) {
@@ -700,6 +702,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return true
     }
 
+    //TODO: diminuir complexidade
     override fun visitDeclaracaoPara(ctx: DeclaracaoParaContext): Valor {
         if (ctx.declaracaoVar() != null) {
             visit(ctx.declaracaoVar())
@@ -743,6 +746,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
+    //TODO: diminuir complexidade
     override fun visitDeclaracaoFacaEnquanto(ctx: DeclaracaoFacaEnquantoContext): Valor {
         var limit = 0
         do {
@@ -796,105 +800,61 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Mapa()
     }
 
+    private fun validarAcessoArray(ctx: AcessoArrayContext, container: Valor.Lista): Valor {
+        val indice = visit(ctx.expressao(0))
+        if (indice !is Valor.Inteiro) throw SemanticError("Índice de lista deve ser um número inteiro")
+        if (indice.valor < 0 || indice.valor >= container.elementos.size)
+            throw SemanticError("Índice fora dos limites da lista: ${indice.valor}")
+        return container.elementos[indice.valor]
+    }
+
+    private fun validarAcessoMapa(ctx: AcessoArrayContext, container: Valor.Mapa): Valor {
+        val chave = visit(ctx.expressao(0))
+
+        // Para acesso bidimensional em mapas
+        if (ctx.expressao().size > 1) {
+            val primeiroElemento = container.elementos[chave] ?: Valor.Nulo
+            val segundoIndice = visit(ctx.expressao(1))
+
+            when (primeiroElemento) {
+                is Valor.Lista -> {
+                    when {
+                        segundoIndice !is Valor.Inteiro -> {
+                            throw SemanticError("Segundo índice deve ser um número inteiro para acessar uma lista")
+                        }
+
+                        segundoIndice.valor < 0 || segundoIndice.valor >= primeiroElemento.elementos.size -> {
+                            throw SemanticError("Segundo índice fora dos limites da lista: ${segundoIndice.valor}")
+                        }
+
+                        else -> return primeiroElemento.elementos[segundoIndice.valor]
+                    }
+                }
+                //TODO: rever mapa case
+                is Valor.Mapa -> {
+                    return primeiroElemento.elementos[segundoIndice] ?: Valor.Nulo
+                }
+                // TODO: rever objeto case
+                is Valor.Objeto -> {
+                    if (segundoIndice !is Valor.Texto) {
+                        throw SemanticError("Chave para acessar campo de objeto deve ser texto")
+                    }
+                    return primeiroElemento.campos[segundoIndice.valor] ?: Valor.Nulo
+                }
+
+                else -> {
+                    throw SemanticError("Elemento com chave $chave não suporta acesso indexado")
+                }
+            }
+        }
+        return container.elementos[chave] ?: Valor.Nulo
+    }
+
     override fun visitAcessoArray(ctx: AcessoArrayContext): Valor {
-        val container = visit(ctx.primario())
-
-        when (container) {
-            is Valor.Lista -> {
-                val indice = visit(ctx.expressao(0))
-
-                if (indice !is Valor.Inteiro) {
-                    throw SemanticError("Índice de lista deve ser um número inteiro")
-                }
-
-                if (indice.valor < 0 || indice.valor >= container.elementos.size) {
-                    throw SemanticError("Índice fora dos limites da lista: ${indice.valor}")
-                }
-
-                // Para acesso bidimensional
-                if (ctx.expressao().size > 1) {
-                    val elemento = container.elementos[indice.valor]
-                    val segundoIndice = visit(ctx.expressao(1))
-
-                    when (elemento) {
-                        is Valor.Lista -> {
-                            if (segundoIndice !is Valor.Inteiro) {
-                                throw SemanticError("Segundo índice deve ser um número inteiro para acessar uma lista")
-                            }
-
-                            if (segundoIndice.valor < 0 || segundoIndice.valor >= elemento.elementos.size) {
-                                throw SemanticError("Segundo índice fora dos limites da lista: ${segundoIndice.valor}")
-                            }
-
-                            return elemento.elementos[segundoIndice.valor]
-                        }
-
-                        is Valor.Mapa -> {
-                            return elemento.elementos[segundoIndice] ?: Valor.Nulo
-                        }
-
-                        is Valor.Objeto -> {
-                            if (segundoIndice !is Valor.Texto) {
-                                throw SemanticError("Chave para acessar campo de objeto deve ser texto")
-                            }
-                            return elemento.campos[segundoIndice.valor] ?: Valor.Nulo
-                        }
-
-                        else -> {
-                            throw SemanticError("Elemento no índice ${indice.valor} não suporta acesso indexado")
-                        }
-                    }
-                }
-
-                return container.elementos[indice.valor]
-            }
-
-            is Valor.Mapa -> {
-                val chave = visit(ctx.expressao(0))
-
-                // Para acesso bidimensional em mapas
-                if (ctx.expressao().size > 1) {
-                    val primeiroElemento = container.elementos[chave] ?: Valor.Nulo
-                    val segundoIndice = visit(ctx.expressao(1))
-
-                    when (primeiroElemento) {
-                        is Valor.Lista -> {
-                            when {
-                                segundoIndice !is Valor.Inteiro -> {
-                                    throw SemanticError("Segundo índice deve ser um número inteiro para acessar uma lista")
-                                }
-
-                                segundoIndice.valor < 0 || segundoIndice.valor >= primeiroElemento.elementos.size -> {
-                                    throw SemanticError("Segundo índice fora dos limites da lista: ${segundoIndice.valor}")
-                                }
-
-                                else -> return primeiroElemento.elementos[segundoIndice.valor]
-                            }
-                        }
-
-                        is Valor.Mapa -> {
-                            return primeiroElemento.elementos[segundoIndice] ?: Valor.Nulo
-                        }
-
-                        is Valor.Objeto -> {
-                            if (segundoIndice !is Valor.Texto) {
-                                throw SemanticError("Chave para acessar campo de objeto deve ser texto")
-                            }
-                            return primeiroElemento.campos[segundoIndice.valor] ?: Valor.Nulo
-                        }
-
-                        else -> {
-                            throw SemanticError("Elemento com chave $chave não suporta acesso indexado")
-                        }
-                    }
-                }
-
-                return container.elementos[chave] ?: Valor.Nulo
-            }
-
-            else -> {
-                throw SemanticError("Operação de acesso com índice não suportada para ${container::class.simpleName}")
-            }
+        return when (val container = visit(ctx.primario())) {
+            is Valor.Lista -> validarAcessoArray(ctx, container)
+            is Valor.Mapa -> validarAcessoMapa(ctx, container)
+            else -> throw SemanticError("Operação de acesso com índice não suportada para ${container::class.simpleName}")
         }
     }
 
@@ -926,6 +886,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
+    //TODO: diminuir complexidade
     private fun chamadaFuncao(nome: String, argumentos: List<Valor>): Valor {
         ambiente.thisObjeto?.let { obj ->
             buscarMetodoNaHierarquia(obj, nome)?.let { ctx ->
@@ -1026,6 +987,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
+    //TODO: diminuir complexidade
     override fun visitPrimario(ctx: PrimarioContext): Valor {
         return when {
             ctx.listaLiteral() != null -> visit(ctx.listaLiteral())

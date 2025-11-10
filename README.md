@@ -12,7 +12,6 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 - **Funções e métodos** com parâmetros e valores de retorno
 - **Funções nativas de E/S** para operações de entrada e saída
 - **Coleções** como listas e mapas
-- **Processamento de arquivos** com bibliotecas nativas _C++_
 - **Suporte a threads** para execução assíncrona
 - **Suporte a multiplos modulos** import de outros arquivos
 
@@ -20,7 +19,6 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 
 - Java JDK 21 ou superior
 - Gradle 8.0 ou superior
-- CMake (para compilação das bibliotecas nativas)
 
 ## Documentação
 
@@ -36,12 +34,6 @@ cd pplus
 ``` 
 
 ## Compilar o projeto
-
-#### Compilar bibliotecas nativas
-
-```bash
-./gradlew buildNative
-```
 
 #### Compilar projeto principal
 
