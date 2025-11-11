@@ -67,12 +67,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
 
     fun processarImport(nomeArquivo: String) {
-        println("caminhoCompleto -> $nomeArquivo")
-        if (arquivosImportados.contains(nomeArquivo)) {
-            println("Arquivo ja importado...")
-            return
-        }
-
+        if (arquivosImportados.contains(nomeArquivo)) return
         arquivosImportados.add(nomeArquivo)
 
         try {
@@ -88,7 +83,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
             processarDeclaracoesDoArquivo(arvore)
         } catch (e: Exception) {
-            throw SemanticError(e.message)
+            throw ArquivoException(e.message ?: "Falha ao processar import")
         }
     }
 
@@ -154,43 +149,60 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
-    //TODO: diminuir complexidade
     override fun visitDeclaracaoClasse(ctx: DeclaracaoClasseContext): Valor {
         val nomeClasse = ctx.ID(0).text
-        var superClasse: String?
 
-        if (ctx.childCount > 3 && ctx.getChild(2).text == "estende") {
-            superClasse = ctx.getChild(3).text
-            global.obterClasse(superClasse)
-                ?: throw SemanticError("Classe base '$superClasse' não encontrada para a classe '$nomeClasse'")
+        obterSuperclasseSeHouver(ctx)?.let { sc ->
+            validarSuperclasseExiste(sc, nomeClasse)
         }
-        val interfaces = mutableListOf<String>()
-        var implementaIndex = -1
 
-        for (i in 0 until ctx.childCount) {
-            if (ctx.getChild(i).text == "implementa") {
-                implementaIndex = i
-                break
+        indiceDaPalavra(ctx, "implementa")
+            .takeIf { it >= 0 }
+            ?.let { idx ->
+                val interfaces = lerIdentificadoresAteChave(ctx, idx + 1)
+                validarInterfacesOuErro(ctx, nomeClasse, interfaces)
             }
-        }
 
-        if (implementaIndex > -1) {
-            var i = implementaIndex + 1
-            while (i < ctx.childCount && ctx.getChild(i).text != "{") {
-                val token = ctx.getChild(i).text
-                if (token != "," && token != "implementa") {
-                    interfaces.add(token)
-                    global.obterInterface(token) ?: throw SemanticError("Interface '$token' não encontrada")
-
-                    if (!verificarImplementacaoInterface(ctx, token)) {
-                        throw SemanticError("A classe '$nomeClasse' não implementa todos os métodos da interface '$token'")
-                    }
-                }
-                i++
-            }
-        }
         global.definirClasse(nomeClasse, ctx)
         return Valor.Nulo
+    }
+
+    private fun obterSuperclasseSeHouver(ctx: DeclaracaoClasseContext): String? =
+        if (ctx.childCount > 3 && ctx.getChild(2).text == "estende") ctx.getChild(3).text else null
+
+    private fun validarSuperclasseExiste(superClasse: String, nomeClasse: String) {
+        global.obterClasse(superClasse)
+            ?: throw SemanticError("Classe base '$superClasse' não encontrada para a classe '$nomeClasse'")
+    }
+
+    private fun indiceDaPalavra(ctx: DeclaracaoClasseContext, palavra: String): Int {
+        for (i in 0 until ctx.childCount) if (ctx.getChild(i).text == palavra) return i
+        return -1
+    }
+
+    private fun lerIdentificadoresAteChave(ctx: DeclaracaoClasseContext, inicio: Int): List<String> {
+        val lista = mutableListOf<String>()
+        var i = inicio
+        while (i < ctx.childCount && ctx.getChild(i).text != "{") {
+            val t = ctx.getChild(i).text
+            if (t != "," && t != "implementa") lista.add(t)
+            i++
+        }
+        return lista
+    }
+
+    private fun validarInterfacesOuErro(
+        classeCtx: DeclaracaoClasseContext,
+        nomeClasse: String,
+        interfaces: List<String>
+    ) {
+        interfaces.forEach { nome ->
+            global.obterInterface(nome)
+                ?: throw SemanticError("Interface '$nome' não encontrada")
+            if (!verificarImplementacaoInterface(classeCtx, nome)) {
+                throw SemanticError("A classe '$nomeClasse' não implementa todos os métodos da interface '$nome'")
+            }
+        }
     }
 
     override fun visitDeclaracaoVar(ctx: DeclaracaoVarContext): Valor {
@@ -309,104 +321,69 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     override fun visitExpressao(ctx: ExpressaoContext): Valor = visit(ctx.getChild(0))
 
-    //TODO: diminuir complexidade
     override fun visitAtribuicao(ctx: AtribuicaoContext): Valor {
-        if (ctx.logicaOu() != null) {
-            return visit(ctx.logicaOu())
-        }
+        ctx.logicaOu()?.let { return visit(it) }
+        val rhs by lazy { visit(ctx.expressao()) }
+        val id = ctx.ID()
+        val acesso = ctx.acesso()
+        val arr = ctx.acessoArray()
 
-        //TODO: rever uso da variavel valor...
-        //val valor = visit(ctx.expressao())
-        if (ctx.ID() != null) {
-            val nome = ctx.ID().text
-            val valor = visit(ctx.expressao())
-            //TODO: validar tipo aqui
-            ambiente.atualizarOuDefinir(nome, valor)
-            return valor
-        }
-        if (ctx.acesso() != null) {
-            val acesso = ctx.acesso()
-            val objeto = visit(acesso.primario())
-
-            if (objeto !is Valor.Objeto) {
-                throw SemanticError("Não é possível atribuir a uma propriedade de um não-objeto")
+        return when {
+            id != null -> rhs.also { v ->
+                ambiente.atualizarOuDefinir(id.text, v)
             }
-            val nomeCampo = acesso.ID().text
-            val valorCampo = visit(ctx.expressao())
 
-            objeto.campos[nomeCampo] = valorCampo
-            return valorCampo
-        }
+            acesso != null -> {
+                val obj = visit(acesso.primario()) as? Valor.Objeto
+                    ?: throw SemanticError("Não é possível atribuir a uma propriedade de um não-objeto")
+                val v = rhs
+                obj.campos[acesso.ID().text] = v
+                v
+            }
 
-        // Se for uma atribuição a um elemento de array
-        if (ctx.acessoArray() != null) {
-            val acessoArray = ctx.acessoArray()
-            val container = visit(acessoArray.primario())
-            val valor = visit(ctx.expressao())
+            arr != null -> {
+                val container = visit(arr.primario())
+                val v = rhs
 
-            when (container) {
-                is Valor.Lista -> {
-                    val indice = visit(acessoArray.expressao(0))
+                when (container) {
+                    is Valor.Lista -> {
+                        val i = visit(arr.expressao(0)) as? Valor.Inteiro
+                            ?: throw SemanticError("Índice de lista deve ser um número inteiro")
+                        if (i.valor < 0) throw SemanticError("Índice negativo não permitido: ${i.valor}")
 
-                    if (indice !is Valor.Inteiro) {
-                        throw SemanticError("Índice de lista deve ser um número inteiro")
+                        while (i.valor >= container.elementos.size) container.elementos.add(Valor.Nulo)
+
+                        if (arr.expressao().size > 1) {
+                            val sub = (container.elementos[i.valor] as? Valor.Lista)
+                                ?: Valor.Lista(mutableListOf()).also { container.elementos[i.valor] = it }
+
+                            val j = visit(arr.expressao(1)) as? Valor.Inteiro
+                                ?: throw SemanticError("Segundo índice deve ser um número inteiro")
+                            if (j.valor < 0) throw SemanticError("Segundo índice negativo não permitido: ${j.valor}")
+
+                            while (j.valor >= sub.elementos.size) sub.elementos.add(Valor.Nulo)
+                            sub.elementos[j.valor] = v
+                        } else {
+                            container.elementos[i.valor] = v
+                        }
+                        v
                     }
 
-                    if (indice.valor < 0) {
-                        throw SemanticError("Índice negativo não permitido: ${indice.valor}")
+                    is Valor.Mapa -> {
+                        val chave = visit(arr.expressao(0))
+                        container.elementos[chave] = v
+                        v
                     }
 
-                    // Expande a lista se necessário
-                    while (indice.valor >= container.elementos.size) {
-                        container.elementos.add(Valor.Nulo)
-                    }
-
-                    // Para acesso bidimensional
-                    if (acessoArray.expressao().size > 1) {
-                        val elemento = container.elementos[indice.valor]
-
-                        // Se o elemento não for uma lista, cria uma
-                        if (elemento !is Valor.Lista) {
-                            container.elementos[indice.valor] = Valor.Lista(mutableListOf())
-                        }
-
-                        val lista = container.elementos[indice.valor] as Valor.Lista
-                        val segundoIndice = visit(acessoArray.expressao(1))
-
-                        if (segundoIndice !is Valor.Inteiro) {
-                            throw SemanticError("Segundo índice deve ser um número inteiro")
-                        }
-
-                        if (segundoIndice.valor < 0) {
-                            throw SemanticError("Segundo índice negativo não permitido: ${segundoIndice.valor}")
-                        }
-
-                        // Expande a sublista se necessário
-                        while (segundoIndice.valor >= lista.elementos.size) {
-                            lista.elementos.add(Valor.Nulo)
-                        }
-                        lista.elementos[segundoIndice.valor] = valor
-                    } else {
-                        container.elementos[indice.valor] = valor
-                    }
-                }
-
-                //MAPA
-                is Valor.Mapa -> {
-                    val chave = visit(acessoArray.expressao(0))
-                    container.elementos[chave] = valor
-                }
-
-                else -> {
-                    throw SemanticError("Operação de atribuição com índice não suportada para ${container::class.simpleName}")
+                    else -> throw SemanticError(
+                        "Operação de atribuição com índice não suportada para ${container::class.simpleName}"
+                    )
                 }
             }
-            return valor
-        }
 
-        throw SemanticError("Erro de sintaxe na atribuição")
+            else -> throw SemanticError("Erro de sintaxe na atribuição")
+        }
     }
-
 
     override fun visitAcesso(ctx: AcessoContext): Valor {
         val objeto = visit(ctx.primario())
@@ -427,7 +404,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             if (esquerda is Valor.Logico && esquerda.valor) return Valor.Logico(true)
             val direita = visit(ctx.logicaE(i))
             if (esquerda !is Valor.Logico || direita !is Valor.Logico) throw SemanticError("Operador 'ou' requer valores lógicos")
-            esquerda = Valor.Logico(esquerda.valor || direita.valor)
+            esquerda = Valor.Logico(direita.valor)
         }
         return esquerda
     }
@@ -438,7 +415,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             if (esquerda is Valor.Logico && !esquerda.valor) return Valor.Logico(false)
             val direita = visit(ctx.igualdade(i))
             if (esquerda !is Valor.Logico || direita !is Valor.Logico) throw SemanticError("Operador 'e' requer valores lógicos")
-            esquerda = Valor.Logico(esquerda.valor && direita.valor)
+            esquerda = Valor.Logico(direita.valor)
         }
         return esquerda
     }
@@ -582,49 +559,60 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return null
     }
 
-    //TODO: diminuir complexidade
+    private fun ehPonto(ctx: ChamadaContext, i: Int) =
+        i < ctx.childCount && ctx.getChild(i).text == "."
+
+    private fun ehChamada(ctx: ChamadaContext, i: Int, n: Int) =
+        (i + 2) < n && ctx.getChild(i + 2).text == "("
+
+    private fun extrairArgumentosEPasso(ctx: ChamadaContext, i: Int, n: Int): Pair<List<Valor>, Int> {
+        val temArgsCtx = (i + 3) < n && ctx.getChild(i + 3) is ArgumentosContext
+        val argumentos = if (temArgsCtx) {
+            val argsCtx = ctx.getChild(i + 3) as ArgumentosContext
+            argsCtx.expressao().map { visit(it) }
+        } else emptyList()
+        val passo = if (temArgsCtx) 5 else 4
+        return argumentos to passo
+    }
+
+    private fun comoObjetoOuErro(v: Valor): Valor.Objeto =
+        v as? Valor.Objeto
+            ?: throw SemanticError("Nao e possivel acessar propriedades de um nao-objeto: $v")
+
+    private fun chamarMetodoOuErro(obj: Valor.Objeto, nome: String, argumentos: List<Valor>): Valor {
+        val metodo = buscarMetodoNaHierarquia(obj, nome)
+            ?: throw SemanticError("Metodo nao encontrado: $nome em classe ${obj.klass}")
+        return executarMetodo(obj, metodo, argumentos)
+    }
+
+    private fun lerPropriedadeOuNulo(obj: Valor.Objeto, nome: String): Valor? =
+        buscarPropriedadeNaHierarquia(obj, nome)
+
+
     override fun visitChamada(ctx: ChamadaContext): Valor {
-        if (ctx.acessoArray() != null) return visit(ctx.acessoArray())
-        var resultado = visit(ctx.primario())
+        ctx.acessoArray()?.let { return visit(it) }
+
+        var r = visit(ctx.primario())
         var i = 1
+        val n = ctx.childCount
 
-        while (i < ctx.childCount) {
-            if (resultado == Valor.Nulo) return Valor.Nulo
-            if (ctx.getChild(i).text == ".") {
-                val id = ctx.getChild(i + 1).text
+        while (i < n) {
+            if (r == Valor.Nulo) return Valor.Nulo
+            if (!ehPonto(ctx, i)) break
 
-                if (resultado !is Valor.Objeto) {
-                    throw SemanticError("Não é possível acessar propriedades de um não-objeto: $resultado")
-                }
+            val id = ctx.getChild(i + 1).text
+            val obj = comoObjetoOuErro(r)
 
-                if (i + 2 < ctx.childCount && ctx.getChild(i + 2).text == "(") {
-                    val args = mutableListOf<Valor>()
-
-                    if (i + 3 < ctx.childCount && ctx.getChild(i + 3) is ArgumentosContext) {
-                        val argsCtx = ctx.getChild(i + 3) as ArgumentosContext
-                        args.addAll(argsCtx.expressao().map { visit(it) })
-                        i += 5
-                    } else {
-                        i += 4
-                    }
-
-                    val metodo = buscarMetodoNaHierarquia(resultado, id)
-                    if (metodo == null) {
-                        throw SemanticError("Método não encontrado: $id em classe ${resultado.klass}")
-                    }
-
-                    resultado = executarMetodo(resultado, metodo, args)
-                } else {
-                    val campoValor = buscarPropriedadeNaHierarquia(resultado, id)
-                    resultado = campoValor ?: Valor.Nulo
-                    i += 2
-                }
+            if (ehChamada(ctx, i, n)) {
+                val (argumentos, passo) = extrairArgumentosEPasso(ctx, i, n)
+                r = chamarMetodoOuErro(obj, id, argumentos)
+                i += passo
             } else {
-                i++
+                r = lerPropriedadeOuNulo(obj, id) ?: Valor.Nulo
+                i += 2
             }
         }
-
-        return resultado
+        return r
     }
 
     override fun visitDeclaracaoEnquanto(ctx: DeclaracaoEnquantoContext): Valor {
@@ -665,30 +653,20 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
-    //TODO: diminuir complexidade
-    fun verificarImplementacaoInterface(classeContext: DeclaracaoClasseContext, nomeInterface: String): Boolean {
-        val interfaceContext = global.obterInterface(nomeInterface) ?: return false
-        for (assinatura in interfaceContext.assinaturaMetodo()) {
-            val nomeMetodo = assinatura.ID().text
-            val implementado = classeContext.declaracaoFuncao().any { it.ID().text == nomeMetodo }
-            if (!implementado) {
-                val superClasse = global.getSuperClasse(classeContext)
-                if (superClasse != null) {
-                    val classeBase = global.obterClasse(superClasse)
-                    if (classeBase != null) {
-                        val implementadoNaSuperClasse = classeBase.declaracaoFuncao().any { it.ID().text == nomeMetodo }
-                        if (!implementadoNaSuperClasse) {
-                            return false
-                        }
-                    } else {
-                        return false
-                    }
-                } else {
-                    return false
-                }
-            }
+    fun verificarImplementacaoInterface(
+        classeContext: DeclaracaoClasseContext,
+        nomeInterface: String
+    ): Boolean {
+        val iface = global.obterInterface(nomeInterface) ?: return false
+
+        val fornecidos = buildSet<String> {
+            addAll(classeContext.declaracaoFuncao().map { it.ID().text })
+            global.getSuperClasse(classeContext)
+                ?.let { global.obterClasse(it) }
+                ?.let { addAll(it.declaracaoFuncao().map { f -> f.ID().text }) }
         }
-        return true
+
+        return iface.assinaturaMetodo().all { it.ID().text in fornecidos }
     }
 
     override fun visitDeclaracaoPara(ctx: DeclaracaoParaContext): Valor {
