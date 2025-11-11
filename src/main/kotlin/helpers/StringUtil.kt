@@ -1,5 +1,5 @@
-import models.Ambiente
 import models.Valor
+import org.gustavolyra.portugolpp.PortugolPPParser.ChamadaContext
 
 fun extrairValorParaImpressao(valor: Valor): String {
     return when (valor) {
@@ -49,23 +49,5 @@ fun extrairValorString(valor: Valor): String {
     }
 }
 
-fun avaliarArgumento(arg: String, ambiente: Ambiente): Valor {
-    return when {
-        arg.startsWith("\"") && arg.endsWith("\"") -> Valor.Texto(arg.substring(1, arg.length - 1))
-        arg == "verdadeiro" -> Valor.Logico(true)
-        arg == "falso" -> Valor.Logico(false)
-        arg.contains(".") -> try {
-            Valor.Real(arg.toDouble())
-        } catch (_: Exception) {
-            Valor.Nulo
-        }
-
-        arg.all { it.isDigit() } -> try {
-            Valor.Inteiro(arg.toInt())
-        } catch (e: Exception) {
-            Valor.Nulo
-        }
-
-        else -> ambiente.obter(arg)
-    }
-}
+fun ehPonto(ctx: ChamadaContext, i: Int) =
+    i < ctx.childCount && ctx.getChild(i).text == "."

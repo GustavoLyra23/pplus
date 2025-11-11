@@ -1,5 +1,6 @@
 package org.gustavolyra.portugolpp
 
+import ehPonto
 import models.Ambiente
 import models.Valor
 import models.enums.LOOP
@@ -7,10 +8,7 @@ import models.errors.*
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.gustavolyra.portugolpp.PortugolPPParser.*
-import processors.comparar
-import processors.processarAdicao
-import processors.processarMultiplicacao
-import processors.saoIguais
+import processors.*
 import setFuncoes
 import java.io.File
 
@@ -93,32 +91,13 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 visitImportarDeclaracao(import)
             }
 
-            visitInterfaces(tree)
-            visitClasses(tree)
+            visitInterfaces(tree, global)
+            visitClasses(tree, global)
             //visitando outras declaracoes mais genericas...
             tree.declaracao().forEach { visit(it) }
             visitFuncaoMain()
         } catch (e: Exception) {
             println(e)
-        }
-    }
-
-    private fun visitInterfaces(tree: ProgramaContext) {
-        tree.declaracao().forEach { decl ->
-            decl.declaracaoInterface()?.let {
-                val nome = it.ID().text
-                global.definirInterface(nome, it)
-            }
-        }
-    }
-
-    //TODO: implementar static...
-    private fun visitClasses(tree: ProgramaContext) {
-        tree.declaracao().forEach { decl ->
-            decl.declaracaoClasse()?.let {
-                val nome = it.ID(0).text
-                global.definirClasse(nome, it)
-            }
         }
     }
 
@@ -153,56 +132,16 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         val nomeClasse = ctx.ID(0).text
 
         obterSuperclasseSeHouver(ctx)?.let { sc ->
-            validarSuperclasseExiste(sc, nomeClasse)
+            validarSuperclasseExiste(sc, nomeClasse, global)
         }
-
         indiceDaPalavra(ctx, "implementa")
             .takeIf { it >= 0 }
             ?.let { idx ->
                 val interfaces = lerIdentificadoresAteChave(ctx, idx + 1)
-                validarInterfacesOuErro(ctx, nomeClasse, interfaces)
+                validarInterfacesOuErro(ctx, nomeClasse, interfaces, global)
             }
-
         global.definirClasse(nomeClasse, ctx)
         return Valor.Nulo
-    }
-
-    private fun obterSuperclasseSeHouver(ctx: DeclaracaoClasseContext): String? =
-        if (ctx.childCount > 3 && ctx.getChild(2).text == "estende") ctx.getChild(3).text else null
-
-    private fun validarSuperclasseExiste(superClasse: String, nomeClasse: String) {
-        global.obterClasse(superClasse)
-            ?: throw SemanticError("Classe base '$superClasse' não encontrada para a classe '$nomeClasse'")
-    }
-
-    private fun indiceDaPalavra(ctx: DeclaracaoClasseContext, palavra: String): Int {
-        for (i in 0 until ctx.childCount) if (ctx.getChild(i).text == palavra) return i
-        return -1
-    }
-
-    private fun lerIdentificadoresAteChave(ctx: DeclaracaoClasseContext, inicio: Int): List<String> {
-        val lista = mutableListOf<String>()
-        var i = inicio
-        while (i < ctx.childCount && ctx.getChild(i).text != "{") {
-            val t = ctx.getChild(i).text
-            if (t != "," && t != "implementa") lista.add(t)
-            i++
-        }
-        return lista
-    }
-
-    private fun validarInterfacesOuErro(
-        classeCtx: DeclaracaoClasseContext,
-        nomeClasse: String,
-        interfaces: List<String>
-    ) {
-        interfaces.forEach { nome ->
-            global.obterInterface(nome)
-                ?: throw SemanticError("Interface '$nome' não encontrada")
-            if (!verificarImplementacaoInterface(classeCtx, nome)) {
-                throw SemanticError("A classe '$nomeClasse' não implementa todos os métodos da interface '$nome'")
-            }
-        }
     }
 
     override fun visitDeclaracaoVar(ctx: DeclaracaoVarContext): Valor {
@@ -227,7 +166,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     override fun visitDeclaracaoFuncao(ctx: DeclaracaoFuncaoContext): Valor {
         val nome = ctx.ID().text
         val tipoRetorno = ctx.tipo()?.text
-        if (retornoFuncaoInvalido(tipoRetorno)) throw SemanticError("Tipo de retorno inválido: $tipoRetorno")
+        if (retornoFuncaoInvalido(tipoRetorno, global)) throw SemanticError("Tipo de retorno inválido: $tipoRetorno")
 
         ambiente.definir(
             nome, Valor.Funcao(
@@ -273,13 +212,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
-    //TODO: refatorar validacao...
-    private fun retornoFuncaoInvalido(tipoRetorno: String?): Boolean {
-        if (tipoRetorno == null) return false
-        return tipoRetorno !in listOf(
-            "Inteiro", "Real", "Texto", "Logico", "Nulo", "Lista", "Mapa"
-        ) && (global.obterClasse(tipoRetorno) == null && global.obterInterface(tipoRetorno) == null)
-    }
 
     //TODO: refatorar vist para declaracao de return
     override fun visitDeclaracaoRetornar(ctx: DeclaracaoRetornarContext): Valor {
@@ -559,8 +491,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return null
     }
 
-    private fun ehPonto(ctx: ChamadaContext, i: Int) =
-        i < ctx.childCount && ctx.getChild(i).text == "."
 
     private fun ehChamada(ctx: ChamadaContext, i: Int, n: Int) =
         (i + 2) < n && ctx.getChild(i + 2).text == "("
@@ -575,10 +505,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return argumentos to passo
     }
 
-    private fun comoObjetoOuErro(v: Valor): Valor.Objeto =
-        v as? Valor.Objeto
-            ?: throw SemanticError("Nao e possivel acessar propriedades de um nao-objeto: $v")
-
     private fun chamarMetodoOuErro(obj: Valor.Objeto, nome: String, argumentos: List<Valor>): Valor {
         val metodo = buscarMetodoNaHierarquia(obj, nome)
             ?: throw SemanticError("Metodo nao encontrado: $nome em classe ${obj.klass}")
@@ -587,7 +513,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     private fun lerPropriedadeOuNulo(obj: Valor.Objeto, nome: String): Valor? =
         buscarPropriedadeNaHierarquia(obj, nome)
-
 
     override fun visitChamada(ctx: ChamadaContext): Valor {
         ctx.acessoArray()?.let { return visit(it) }
@@ -653,22 +578,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return Valor.Nulo
     }
 
-    fun verificarImplementacaoInterface(
-        classeContext: DeclaracaoClasseContext,
-        nomeInterface: String
-    ): Boolean {
-        val iface = global.obterInterface(nomeInterface) ?: return false
-
-        val fornecidos = buildSet<String> {
-            addAll(classeContext.declaracaoFuncao().map { it.ID().text })
-            global.getSuperClasse(classeContext)
-                ?.let { global.obterClasse(it) }
-                ?.let { addAll(it.declaracaoFuncao().map { f -> f.ID().text }) }
-        }
-
-        return iface.assinaturaMetodo().all { it.ID().text in fornecidos }
-    }
-
     override fun visitDeclaracaoPara(ctx: DeclaracaoParaContext): Valor {
         ctx.declaracaoVar()?.let { visit(it) } ?: ctx.expressao(0)?.let { visit(it) }
         loop@ while (true) {
@@ -697,7 +606,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
         return Valor.Nulo
     }
-
 
     override fun visitDeclaracaoFacaEnquanto(ctx: DeclaracaoFacaEnquantoContext): Valor {
         var iter = 0

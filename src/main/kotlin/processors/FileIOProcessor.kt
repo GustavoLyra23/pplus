@@ -2,7 +2,6 @@ package processors
 
 object FileIOProcessor {
 
-    // ler arquivo como String
     fun lerArquivo(path: String): String {
         return try {
             java.io.File(path).readText()
