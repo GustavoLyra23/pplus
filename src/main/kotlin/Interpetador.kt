@@ -691,47 +691,32 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         return true
     }
 
-    //TODO: diminuir complexidade
     override fun visitDeclaracaoPara(ctx: DeclaracaoParaContext): Valor {
-        if (ctx.declaracaoVar() != null) {
-            visit(ctx.declaracaoVar())
-        } else if (ctx.expressao(0) != null) {
-            visit(ctx.expressao(0))
-        }
+        ctx.declaracaoVar()?.let { visit(it) } ?: ctx.expressao(0)?.let { visit(it) }
+        loop@ while (true) {
+            val cond = visit(ctx.expressao(0)) as? Valor.Logico
+                ?: throw SemanticError("Condição do 'para' deve ser um valor lógico")
+            if (!cond.valor) break
 
-        while (true) {
-            val condicao = visit(ctx.expressao(0))
-
-            if (condicao !is Valor.Logico) {
-                throw SemanticError("Condição do 'para' deve ser um valor lógico")
-            }
-
-            if (!condicao.valor) {
-                break
-            }
-
+            var doIncrement = true
             try {
                 visit(ctx.declaracao())
-            } catch (e: RetornoException) {
-                throw e
-            } catch (_: BreakException) {
-                break
-            } catch (_: ContinueException) {
-                // Isso existe para validar a logica dentro do loop antes de dar o continue...
-                val condicao = visit(ctx.expressao(0))
-                if (condicao !is Valor.Logico) {
-                    throw SemanticError("Condição do 'para' deve ser um valor lógico")
+            } catch (e: Exception) {
+                when (e) {
+                    is RetornoException -> throw e
+                    is BreakException -> {
+                        doIncrement = false; break@loop
+                    }
+
+                    is ContinueException -> {}
+                    else -> throw e
                 }
-                if (!condicao.valor) {
-                    break
-                } else {
+            } finally {
+                if (doIncrement) {
                     visit(ctx.expressao(1))
-                    continue
                 }
             }
-            visit(ctx.expressao(1))
         }
-
         return Valor.Nulo
     }
 
