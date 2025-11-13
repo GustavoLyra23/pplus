@@ -8,84 +8,17 @@ import processors.FileIOProcessor.escreverArquivo
 import processors.FileIOProcessor.lerArquivo
 import java.util.*
 
-// Native pdk functions
-fun setFuncoes(global: Ambiente) {
+fun setFuncoesDefault(global: Ambiente) {
+    registrarFuncoesIO(global)
+    registarFuncoesThread(global)
+    registrarFuncoesExecptions(global)
+    registrarFuncoesColecoes(global)
+}
 
-    global.definir("escrever", Valor.Funcao("escrever", null) { args ->
-        val valores = args.map { extrairValorParaImpressao(it) }
-        println(valores.joinToString(" "))
-        Valor.Nulo
-    })
-
-    global.definir("imprimir", Valor.Funcao("imprimir", null) { args ->
-        val valores = args.map { extrairValorParaImpressao(it) }
-        println(valores.joinToString(" "))
-        Valor.Nulo
-    })
-
-    global.definir("jogarError", Valor.Funcao("jogarError", null) { args ->
-        if (args.isEmpty()) {
-            throw RuntimeException("Função jogarError requer um argumento (mensagem de erro)")
-        }
-        val mensagem = args[0]
-        if (mensagem !is Valor.Texto) {
-            throw RuntimeException("Argumento deve ser um texto (mensagem de erro)")
-        }
-        throw RuntimeException(mensagem.valor)
-    })
-
-    //TODO: rever implementacao das threads
-    global.definir("executar", Valor.Funcao("executar", null) { args ->
-        if (args.isEmpty() || args[0] !is Valor.Funcao) {
-            throw RuntimeException("Argumento invalido para a funcao.")
-        }
-        val funcaoParaExecutar = args[0] as Valor.Funcao
-        val argumentosReais = args.drop(1)
-        runBlocking {
-            launch {
-                try {
-                    when {
-                        funcaoParaExecutar.implementacao != null -> {
-                            funcaoParaExecutar.implementacao.invoke(argumentosReais, global)
-                        }
-
-                        funcaoParaExecutar.metodoCallback != null -> {
-                            funcaoParaExecutar.metodoCallback.invoke(argumentosReais)
-                        }
-
-                        else -> {
-                            throw RuntimeException("Função não tem implementação executável")
-                        }
-                    }
-                } catch (e: Exception) {
-                    println("Erro na execucao da thread: ${e.message}")
-                }
-            }.join()
-        }
-        Valor.Nulo
-    })
-
+fun registrarFuncoesIO(global: Ambiente) {
     global.definir("ler", Valor.Funcao("ler", null) { args ->
         Scanner(System.`in`).nextLine().let { Valor.Texto(it) }
     })
-
-    global.definir("dormir", Valor.Funcao("aguardar", null, null, null) { args ->
-        if (args.isEmpty()) {
-            throw RuntimeException("Função aguardar requer um argumento (milissegundos)")
-        }
-
-        val tempo = args[0]
-
-        if (tempo !is Valor.Inteiro) {
-            throw RuntimeException("Argumento deve ser um número inteiro (milissegundos)")
-        }
-
-        runBlocking {
-            delay(tempo.valor.toLong())
-        }
-        Valor.Nulo
-    })
-
     global.definir("lerArquivo", Valor.Funcao("lerArquivo", null) { args ->
         if (args.isEmpty()) throw RuntimeException("Função lerArquivo requer um argumento (caminho do arquivo)")
         if (args.size > 1) throw RuntimeException("Função lerArquivo aceita apenas um argumento")
@@ -101,7 +34,6 @@ fun setFuncoes(global: Ambiente) {
             throw ArquivoException("Erro ao ler arquivo '${argVal.valor}': ${e.message}")
         }
     })
-
     global.definir("escreverArquivo", Valor.Funcao("escreverArquivo", null) { args ->
         require(args.size in 2..3) { "Função escreverArquivo requer 2 ou 3 argumentos" }
         val (path, data) = args.take(2)
@@ -120,7 +52,80 @@ fun setFuncoes(global: Ambiente) {
         }
         Valor.Nulo
     })
+    global.definir("escrever", Valor.Funcao("escrever", null) { args ->
+        val valores = args.map { extrairValorParaImpressao(it) }
+        println(valores.joinToString(" "))
+        Valor.Nulo
+    })
+    global.definir("imprimir", Valor.Funcao("imprimir", null) { args ->
+        val valores = args.map { extrairValorParaImpressao(it) }
+        println(valores.joinToString(" "))
+        Valor.Nulo
+    })
+}
 
+fun registarFuncoesThread(global: Ambiente) {
+    global.definir("executar", Valor.Funcao("executar", null) { args ->
+        if (args.isEmpty() || args[0] !is Valor.Funcao) {
+            throw RuntimeException("Argumento invalido para a funcao.")
+        }
+        val funcaoParaExecutar = args[0] as Valor.Funcao
+        val argumentosReais = args.drop(1)
+        runBlocking {
+            launch {
+                try {
+                    when {
+                        funcaoParaExecutar.implementacao != null -> funcaoParaExecutar.implementacao.invoke(
+                            argumentosReais,
+                            global
+                        )
+
+                        funcaoParaExecutar.metodoCallback != null -> funcaoParaExecutar.metodoCallback.invoke(
+                            argumentosReais
+                        )
+                        else -> {
+                            throw RuntimeException("Função não tem implementação executável")
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("Erro na execucao da thread: ${e.message}")
+                }
+            }.join()
+        }
+        Valor.Nulo
+    })
+    global.definir("dormir", Valor.Funcao("aguardar", null, null, null) { args ->
+        if (args.isEmpty()) {
+            throw RuntimeException("Função aguardar requer um argumento (milissegundos)")
+        }
+
+        val tempo = args[0]
+
+        if (tempo !is Valor.Inteiro) {
+            throw RuntimeException("Argumento deve ser um número inteiro (milissegundos)")
+        }
+
+        runBlocking {
+            delay(tempo.valor.toLong())
+        }
+        Valor.Nulo
+    })
+}
+
+fun registrarFuncoesExecptions(global: Ambiente) {
+    global.definir("jogarError", Valor.Funcao("jogarError", null) { args ->
+        if (args.isEmpty()) {
+            throw RuntimeException("Função jogarError requer um argumento (mensagem de erro)")
+        }
+        val mensagem = args[0]
+        if (mensagem !is Valor.Texto) {
+            throw RuntimeException("Argumento deve ser um texto (mensagem de erro)")
+        }
+        throw RuntimeException(mensagem.valor)
+    })
+}
+
+fun registrarFuncoesColecoes(global: Ambiente) {
     global.definir("tamanho", Valor.Funcao("tamanho", null) { args ->
         if (args.isEmpty()) {
             throw RuntimeException("Função tamanho requer um argumento (lista, mapa ou texto)")
@@ -133,7 +138,6 @@ fun setFuncoes(global: Ambiente) {
             else -> throw RuntimeException("Função tamanho só funciona com listas, mapas ou textos")
         }
     })
-
     global.definir("adicionar", Valor.Funcao("adicionar", null) { args ->
         if (args.size < 2) {
             throw RuntimeException("Função adicionar requer pelo menos 2 argumentos: lista e elemento")
@@ -149,7 +153,6 @@ fun setFuncoes(global: Ambiente) {
         }
         lista
     })
-
     global.definir("remover", Valor.Funcao("remover", null) { args ->
         if (args.size != 2) {
             throw RuntimeException("Função remover requer 2 argumentos: lista e índice")
@@ -173,7 +176,6 @@ fun setFuncoes(global: Ambiente) {
 
         lista.elementos.removeAt(indice.valor)
     })
-
     global.definir("chaves", Valor.Funcao("chaves", null) { args ->
         if (args.isEmpty()) {
             throw RuntimeException("Função chaves requer um argumento (mapa)")
@@ -186,7 +188,6 @@ fun setFuncoes(global: Ambiente) {
 
         Valor.Lista(mapa.elementos.keys.toMutableList())
     })
-
     global.definir("valores", Valor.Funcao("valores", null) { args ->
         if (args.isEmpty()) {
             throw RuntimeException("Função valores requer um argumento (mapa)")
@@ -199,7 +200,6 @@ fun setFuncoes(global: Ambiente) {
 
         Valor.Lista(mapa.elementos.values.toMutableList())
     })
-
     global.definir("contemChave", Valor.Funcao("contemChave", null) { args ->
         if (args.size != 2) {
             throw RuntimeException("Função contemChave requer 2 argumentos: mapa e chave")
@@ -215,7 +215,6 @@ fun setFuncoes(global: Ambiente) {
         Valor.Logico(mapa.elementos.containsKey(chave))
     })
 }
-
 
 
 

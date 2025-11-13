@@ -9,7 +9,7 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.gustavolyra.portugolpp.PortugolPPParser.*
 import processors.*
-import setFuncoes
+import setFuncoesDefault
 import java.io.File
 
 
@@ -28,7 +28,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     //setando funcoes nativas da linguagem...
     init {
-        setFuncoes(global)
+        setFuncoesDefault(global)
     }
 
     override fun visitImportarDeclaracao(ctx: ImportarDeclaracaoContext): Valor {
