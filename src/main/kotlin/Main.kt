@@ -6,7 +6,7 @@ import org.gustavolyra.portugolpp.PortugolPPParser
 import java.io.File
 import kotlin.system.exitProcess
 
-val interpretador = Interpretador()
+var interpretador = Interpretador()
 fun main() {
     println("Iniciando Portugol++")
     when {
@@ -28,6 +28,7 @@ fun modoInterativo() {
                 val caminho = input.substring(4).trim()
                 executarArquivo(caminho)
             }
+            input == "reset" -> interpretador = Interpretador()
             else -> executarPortugolPP(input)
         }
     }
