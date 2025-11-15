@@ -147,7 +147,10 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     override fun visitDeclaracaoVar(ctx: DeclaracaoVarContext): Valor {
         val nome = ctx.ID().text
         val tipo = ctx.tipo()?.text
-        val valor = ctx.expressao()?.let { visit(it) } ?: Valor.Nulo
+        val valor = when {
+            (ctx.expressao() != null) -> visit(ctx.expressao());
+            else -> visit(ctx.declaracaoFuncao())
+        }
 
         if (tipo != null) {
             if (valor is Valor.Objeto) {
@@ -167,36 +170,30 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         val nome = ctx.ID().text
         val tipoRetorno = ctx.tipo()?.text
         if (retornoFuncaoInvalido(tipoRetorno, global)) throw SemanticError("Tipo de retorno inválido: $tipoRetorno")
-
-        ambiente.definir(
-            nome, Valor.Funcao(
-                nome = nome,
-                declaracao = ctx,
-                tipoRetorno = tipoRetorno,
-                implementacao = definirImplementacao(ctx, nome)
-            )
-        )
-        return Valor.Nulo
+        val func = Valor.Funcao(
+            nome = nome,
+            declaracao = ctx,
+            tipoRetorno = tipoRetorno,
+            closure = ambiente,
+            implementacao = definirImplementacao(ctx, nome, Ambiente(ambiente)))
+        ambiente.definir(nome, func)
+        return func
     }
 
     private fun definirImplementacao(
-        ctx: DeclaracaoFuncaoContext, nome: String
-    ): (List<Valor>, Ambiente) -> Valor {
-        return { argumentos, ambienteGlobal ->
+        ctx: DeclaracaoFuncaoContext, nome: String, closure: Ambiente
+    ): (List<Valor>) -> Valor {
+        return { argumentos ->
             val numParamsDeclarados = ctx.listaParams()?.param()?.size ?: 0
-            if (argumentos.size > numParamsDeclarados) {
-                throw SemanticError("Função '$nome' recebeu ${argumentos.size} parâmetros, mas espera $numParamsDeclarados")
-            }
-
-            val funcaoAmbiente = Ambiente(ambienteGlobal)
+            if (argumentos.size > numParamsDeclarados) throw SemanticError("Função '$nome' recebeu ${argumentos.size} parâmetros, mas espera $numParamsDeclarados")
             ctx.listaParams()?.param()?.forEachIndexed { i, param ->
-                if (i < argumentos.size) funcaoAmbiente.definir(param.ID().text, argumentos[i])
+                if (i < argumentos.size) closure.definir(param.ID().text, argumentos[i])
             }
 
             val ambienteAnterior = ambiente
-            ambiente = funcaoAmbiente
+            ambiente = closure
             val funcao = Valor.Funcao(
-                ctx.ID().text, ctx, ctx.tipo()?.text
+                ctx.ID().text, ctx, ctx.tipo()?.text, global
             )
             val funcaoAnterior = funcaoAtual
             funcaoAtual = funcao
@@ -211,7 +208,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             }
         }
     }
-
 
     //TODO: refatorar vist para declaracao de return
     override fun visitDeclaracaoRetornar(ctx: DeclaracaoRetornarContext): Valor {
@@ -255,16 +251,17 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     override fun visitAtribuicao(ctx: AtribuicaoContext): Valor {
         ctx.logicaOu()?.let { return visit(it) }
-        val rhs by lazy { visit(ctx.expressao()) }
+        val rhs = when {
+            ctx.expressao() != null -> visit(ctx.expressao())
+            else -> throw SemanticError("Atribuicao invalida")
+        }
         val id = ctx.ID()
         val acesso = ctx.acesso()
         val arr = ctx.acessoArray()
-
         return when {
             id != null -> rhs.also { v ->
                 ambiente.atualizarOuDefinir(id.text, v)
             }
-
             acesso != null -> {
                 val obj = visit(acesso.primario()) as? Valor.Objeto
                     ?: throw SemanticError("Não é possível atribuir a uma propriedade de um não-objeto")
@@ -272,7 +269,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 obj.campos[acesso.ID().text] = v
                 v
             }
-
             arr != null -> {
                 val container = visit(arr.primario())
                 val v = rhs
@@ -312,7 +308,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                     )
                 }
             }
-
             else -> throw SemanticError("Erro de sintaxe na atribuição")
         }
     }
@@ -722,20 +717,6 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         }
     }
 
-    private fun Valor.compativelCom(expected: String): Boolean = when (this) {
-        is Valor.Objeto -> typeString() == expected || superClasse == expected || interfaces.contains(expected)
-
-        else -> typeString() == expected
-    }
-
-    private fun validarRetorno(nome: String, tipoEsperado: String?, resultado: Valor) {
-        if (tipoEsperado == null) return
-        if (resultado.compativelCom(tipoEsperado)) return
-        throw SemanticError(
-            "Erro de tipo: função '$nome' deve retornar '$tipoEsperado', mas retornou '${resultado.typeString()}'"
-        )
-    }
-
     private fun resolverFuncao(nome: String): Valor.Funcao =
         runCatching { ambiente.obter(nome) as? Valor.Funcao }.getOrNull()
             ?: throw SemanticError("Função não encontrada ou não é função: $nome")
@@ -748,17 +729,9 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 )
             }
         }
-
         val funcao = resolverFuncao(nome)
-        return when (val cb = funcao.metodoCallback) {
-            null -> funcao.implementacao?.invoke(argumentos, ambiente)
+        return funcao.implementacao?.invoke(argumentos)
                 ?: throw SemanticError("Função '$nome' não possui implementação.")
-
-            else -> cb(argumentos).also { resultado ->
-                validarRetorno(nome, funcao.tipoRetorno, resultado)
-            }
-        }
-
     }
 
 
@@ -767,9 +740,8 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         metodoAmbiente.thisObjeto = objeto
 
         val funcao = Valor.Funcao(
-            metodo.ID().text, metodo, metodo.tipo()?.text
+            metodo.ID().text, metodo, metodo.tipo()?.text, metodoAmbiente
         )
-
         val funcaoAnterior = funcaoAtual
         funcaoAtual = funcao
 

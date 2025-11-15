@@ -20,7 +20,7 @@ fun extrairValorParaImpressao(valor: Valor): String {
         is Valor.Real -> valor.valor.toString()
         is Valor.Logico -> if (valor.valor) "verdadeiro" else "falso"
         is Valor.Objeto -> "[Objeto ${valor.klass}]"
-        is Valor.Funcao -> "[função ${valor.nome}]"
+        is Valor.Funcao -> "[fun ${valor.nome}]"
         Valor.Nulo -> "nulo"
         else -> valor.toString()
     }

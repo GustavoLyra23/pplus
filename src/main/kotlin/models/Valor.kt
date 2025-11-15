@@ -34,11 +34,10 @@ sealed class Valor {
     data class Funcao(
         val nome: String,
         //TODO: repensar estrategia de uso desta variavel...
-        val declaracao: PortugolPPParser.DeclaracaoFuncaoContext? = null, val tipoRetorno: String? = null,
-        //novo campo..
-        val implementacao: ((List<Valor>, Ambiente) -> Valor)? = null,
-        // campo para funcoes nativas
-        val metodoCallback: ((List<Valor>) -> Valor)? = null
+        val declaracao: PortugolPPParser.DeclaracaoFuncaoContext? = null,
+        val tipoRetorno: String? = null,
+        val closure: Ambiente,
+        val implementacao: ((List<Valor>) -> Valor)? = null,
     ) : Valor()
 
     object Nulo : Valor()

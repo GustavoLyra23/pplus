@@ -75,7 +75,7 @@ declaracaoClasse
     ;
 
 declaracaoVar
-    : 'var' ID (':' tipo)? ('=' expressao)? ';'
+    : 'var' ID (':' tipo)? ('=' (expressao | declaracaoFuncao))? ';'
     ;
 
 declaracaoFuncao
