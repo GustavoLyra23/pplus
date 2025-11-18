@@ -818,7 +818,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             ctx.expressao() != null -> visit(ctx.expressao())
             ctx.text == "verdadeiro" -> Valor.Logico(true)
             ctx.text == "falso" -> Valor.Logico(false)
-            ctx.text == "this" -> ambiente.thisObjeto ?: throw SemanticError("'this' fora de contexto de objeto")
+            ctx.text == "este" -> ambiente.thisObjeto ?: throw SemanticError("'este' fora de contexto de objeto")
             ctx.text.startsWith("novo") -> resolverClassePrimario(ctx)
             else -> {
                 Valor.Nulo
@@ -864,9 +864,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
         val objeto = Valor.Objeto(nomeClasse, mutableMapOf(), superClasse, interfaces)
 
-        if (superClasse != null) {
-            inicializarCamposDaClasseBase(objeto, superClasse)
-        }
+        if (superClasse != null) inicializarCamposDaClasseBase(objeto, superClasse)
 
         classe.declaracaoVar().forEach { decl ->
             val nomeCampo = decl.ID().text

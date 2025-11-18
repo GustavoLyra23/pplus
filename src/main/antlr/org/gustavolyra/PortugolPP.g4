@@ -172,7 +172,7 @@ primario
     | NUMERO
     | TEXTO_LITERAL
     | ID ('(' argumentos? ')')?
-    | 'this'
+    | 'este'
     | '(' expressao ')'
     | 'novo' ID '(' argumentos? ')'
     | listaLiteral
