@@ -97,6 +97,7 @@ tipo
     | 'Logico'
     | 'Lista'
     | 'Mapa'
+    | 'Funcao'
     | ID
     ;
 
