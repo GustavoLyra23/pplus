@@ -1,6 +1,6 @@
 ## Sobre o Projeto
 
-_P++_ é uma linguagem de programação destinada a falantes de português, facilitando o aprendizado de programação através
+<mark>_P++_ é uma linguagem de programação destinada a falantes de português</mark>, facilitando o aprendizado de programação através
 de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens orientadas a objetos.
 
 ## Características
