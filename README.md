@@ -5,16 +5,16 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 
 ## Características
 
-- **Sintaxe amigável** em português baseada em Portugol
-- **Programação Orientada a Objetos** com classes, herança e interfaces
-- **Tipagem dinâmica** para facilitar o aprendizado
-- **Estruturas de controle** (condicionais, loops)
-- **Funções e métodos** com parâmetros e valores de retorno
-- **Funções nativas de E/S** para operações de entrada e saída
-- **Coleções** como listas e mapas
-- **Suporte a threads** para execução assíncrona
-- **Suporte a multiplos modulos** import de outros arquivos
--  **Suporte a closures**
+- <mark>**Sintaxe amigável**</mark> em português baseada em Portugol
+- <mark>**Programação Orientada a Objetos**</mark> com classes, herança e interfaces
+- <mark>**Tipagem dinâmica**</mark> para facilitar o aprendizado
+- <mark>**Estruturas de controle**</mark> (condicionais, loops)
+- <mark>**Funções e métodos**</mark> com parâmetros e valores de retorno
+- <mark>**Funções nativas de E/S**</mark> para operações de entrada e saída
+- <mark>**Coleções**</mark> como listas e mapas
+- <mark>**Suporte a threads**</mark> para execução assíncrona
+- <mark>**Suporte a multiplos modulos**</mark> import de outros arquivos
+-  <mark>**Suporte a closures**</mark>
 
 ## Requisitos do Sistema
 
