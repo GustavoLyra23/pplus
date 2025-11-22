@@ -14,6 +14,7 @@ de uma sintaxe semelhante ao Portugol, mas com recursos modernos de linguagens o
 - **Coleções** como listas e mapas
 - **Suporte a threads** para execução assíncrona
 - **Suporte a multiplos modulos** import de outros arquivos
+-  **Suporte a closures**
 
 ## Requisitos do Sistema
 
