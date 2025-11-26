@@ -5,7 +5,7 @@ import org.gustavolyra.portugolpp.PortugolPPParser
 class Ambiente(val enclosing: Ambiente? = null) {
     private val valores = mutableMapOf<String, Valor>()
 
-    private val classes = mutableMapOf<String, PortugolPPParser.DeclaracaoClasseContext>()
+    private val classes = mutableMapOf<String, PortugolPPParser.DeclaracaoClasseContext?>()
 
     private val interfaces = mutableMapOf<String, PortugolPPParser.DeclaracaoInterfaceContext>()
 
@@ -18,6 +18,10 @@ class Ambiente(val enclosing: Ambiente? = null) {
 
     fun obterInterface(nome: String): PortugolPPParser.DeclaracaoInterfaceContext? {
         return interfaces[nome] ?: enclosing?.obterInterface(nome)
+    }
+
+    fun interfaceExists(nome: String): Boolean {
+        return this.interfaces.containsKey(nome)
     }
 
     fun getInterfaces(classeContext: PortugolPPParser.DeclaracaoClasseContext): List<String> {
@@ -72,12 +76,16 @@ class Ambiente(val enclosing: Ambiente? = null) {
         return Valor.Nulo
     }
 
-    fun definirClasse(nome: String, declaracao: PortugolPPParser.DeclaracaoClasseContext) {
+    fun definirClasse(nome: String, declaracao: PortugolPPParser.DeclaracaoClasseContext?) {
         classes[nome] = declaracao
     }
 
     fun obterClasse(nome: String): PortugolPPParser.DeclaracaoClasseContext? {
         return classes[nome] ?: enclosing?.obterClasse(nome)
+    }
+
+    fun classExists(nome: String): Boolean {
+        return classes.containsKey(nome)
     }
 
     fun atualizarOuDefinir(nome: String, valor: Valor) {

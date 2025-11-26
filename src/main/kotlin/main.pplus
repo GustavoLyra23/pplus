@@ -1,0 +1,10 @@
+funcao h() {
+    var b = 3;
+    var tt = funcao g() {
+          escrever(b + 3);
+        };
+    retornar tt;
+}
+
+var b = h();
+b();
