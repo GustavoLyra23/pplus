@@ -1,10 +1,8 @@
-funcao h() {
-    var b = 3;
-    var tt = funcao g() {
-          escrever(b + 3);
-        };
-    retornar tt;
-}
+var numeros: Lista = [10];
+numeros[8] = 23;
+numeros[8] = nulo;
+escrever(numeros);
 
-var b = h();
-b();
+var data = nulo;
+data = 23;
+escrever(data);

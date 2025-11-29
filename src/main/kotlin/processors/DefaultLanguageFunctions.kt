@@ -1,3 +1,6 @@
+package processors
+
+import extrairValorParaImpressao
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -117,79 +120,6 @@ fun registrarFuncoesColecoes(global: Ambiente) {
             is Valor.Texto -> Valor.Inteiro(arg.valor.length)
             else -> throw RuntimeException("Função tamanho só funciona com listas, mapas ou textos")
         }
-    })
-    global.definir("adicionar", Valor.Funcao("adicionar", null, null, global) { args ->
-        if (args.size < 2) {
-            throw RuntimeException("Função adicionar requer pelo menos 2 argumentos: lista e elemento")
-        }
-
-        val lista = args[0]
-        if (lista !is Valor.Lista) {
-            throw RuntimeException("Primeiro argumento deve ser uma lista")
-        }
-
-        for (i in 1 until args.size) {
-            lista.elementos.add(args[i])
-        }
-        lista
-    })
-    global.definir("remover", Valor.Funcao("remover", null, null, global) { args ->
-        if (args.size != 2) {
-            throw RuntimeException("Função remover requer 2 argumentos: lista e índice")
-        }
-
-        val lista = args[0]
-        val indice = args[1]
-
-
-        if (lista !is Valor.Lista) {
-            throw RuntimeException("Primeiro argumento deve ser uma lista")
-        }
-
-        if (indice !is Valor.Inteiro) {
-            throw RuntimeException("Segundo argumento deve ser um número inteiro")
-        }
-
-        if (indice.valor < 0 || indice.valor >= lista.elementos.size) {
-            throw RuntimeException("Índice fora dos limites da lista: ${indice.valor}")
-        }
-
-        lista.elementos.removeAt(indice.valor)
-    })
-    global.definir("chaves", Valor.Funcao("chaves", null, "Lista", global) { args ->
-        if (args.isEmpty()) throw RuntimeException("Função chaves requer um argumento (mapa)")
-        val mapa = args[0]
-        if (mapa !is Valor.Mapa) {
-            throw RuntimeException("Argumento deve ser um mapa")
-        }
-
-        Valor.Lista(mapa.elementos.keys.toMutableList())
-    })
-    global.definir("valores", Valor.Funcao("valores", null, "Lista", global) { args ->
-        if (args.isEmpty()) {
-            throw RuntimeException("Função valores requer um argumento (mapa)")
-        }
-
-        val mapa = args[0]
-        if (mapa !is Valor.Mapa) {
-            throw RuntimeException("Argumento deve ser um mapa")
-        }
-
-        Valor.Lista(mapa.elementos.values.toMutableList())
-    })
-    global.definir("contemChave", Valor.Funcao("contemChave", null, "Logico", global) { args ->
-        if (args.size != 2) {
-            throw RuntimeException("Função contemChave requer 2 argumentos: mapa e chave")
-        }
-
-        val mapa = args[0]
-        val chave = args[1]
-
-        if (mapa !is Valor.Mapa) {
-            throw RuntimeException("Primeiro argumento deve ser um mapa")
-        }
-
-        Valor.Logico(mapa.elementos.containsKey(chave))
     })
 }
 

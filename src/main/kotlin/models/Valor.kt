@@ -13,7 +13,10 @@ sealed class Valor {
 
     data class Logico(val valor: Boolean) : Valor()
 
-    data class Lista(val elementos: MutableList<Valor> = mutableListOf()) : Valor()
+    data class Lista(
+        val elementos: MutableList<Valor> = mutableListOf(),
+        var tamanho: Int
+    ) : Valor()
 
     data class Mapa(val elementos: MutableMap<Valor, Valor> = mutableMapOf()) : Valor()
 

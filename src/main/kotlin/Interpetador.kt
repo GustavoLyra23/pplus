@@ -9,7 +9,6 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.gustavolyra.portugolpp.PortugolPPParser.*
 import processors.*
-import setFuncoesDefault
 import java.io.File
 
 
@@ -93,23 +92,9 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
             visitInterfaces(tree, global)
             visitClasses(tree, global)
-            //visitando outras declaracoes mais genericas...
             tree.declaracao().forEach { visit(it) }
-            visitFuncaoMain()
         } catch (e: Exception) {
             println(e)
-        }
-    }
-
-    private fun visitFuncaoMain() {
-        try {
-            val main = global.obter("main")
-            if (main is Valor.Funcao) {
-                //TODO: refatorar.... os argumentos da funcao main serao ignorados...
-                chamadaFuncao("main", emptyList())
-            }
-        } catch (_: Exception) {
-            throw MainExecutionException("Falha durante a execução da função main")
         }
     }
 
@@ -270,37 +255,21 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
                 v
             }
             arr != null -> {
-                val container = visit(arr.primario())
-                val v = rhs
-
-                when (container) {
+                when (val container = visit(arr.primario())) {
                     is Valor.Lista -> {
                         val i = visit(arr.expressao(0)) as? Valor.Inteiro
                             ?: throw SemanticError("Índice de lista deve ser um número inteiro")
-                        if (i.valor < 0) throw SemanticError("Índice negativo não permitido: ${i.valor}")
-
-                        while (i.valor >= container.elementos.size) container.elementos.add(Valor.Nulo)
-
-                        if (arr.expressao().size > 1) {
-                            val sub = (container.elementos[i.valor] as? Valor.Lista)
-                                ?: Valor.Lista(mutableListOf()).also { container.elementos[i.valor] = it }
-
-                            val j = visit(arr.expressao(1)) as? Valor.Inteiro
-                                ?: throw SemanticError("Segundo índice deve ser um número inteiro")
-                            if (j.valor < 0) throw SemanticError("Segundo índice negativo não permitido: ${j.valor}")
-
-                            while (j.valor >= sub.elementos.size) sub.elementos.add(Valor.Nulo)
-                            sub.elementos[j.valor] = v
-                        } else {
-                            container.elementos[i.valor] = v
-                        }
-                        v
+                        val indice = i.valor
+                        if (indice < 0) throw SemanticError("Índice negativo não permitido: $indice")
+                        container.elementos[indice] = rhs
+                        rhs
                     }
 
+                    //TODO: arrumar indices nos mapas...
                     is Valor.Mapa -> {
                         val chave = visit(arr.expressao(0))
-                        container.elementos[chave] = v
-                        v
+                        container.elementos[chave] = rhs
+                        rhs
                     }
 
                     else -> throw SemanticError(
@@ -629,8 +598,12 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
         throw BreakException()
     }
 
+    //TODO: ajustar declaracao de listas....
     override fun visitListaLiteral(ctx: ListaLiteralContext): Valor {
-        return Valor.Lista()
+        val indice = ctx.NUMERO().text.toInt()
+        val list = mutableListOf<Valor>()
+        while (list.size < indice) list.add(Valor.Nulo)
+        return Valor.Lista(list, indice)
     }
 
 
@@ -641,7 +614,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
     private fun validarAcessoArray(ctx: AcessoArrayContext, container: Valor.Lista): Valor {
         val indice = visit(ctx.expressao(0))
         if (indice !is Valor.Inteiro) throw SemanticError("Índice de lista deve ser um número inteiro")
-        if (indice.valor < 0 || indice.valor >= container.elementos.size)
+        if (indice.valor < 0 || indice.valor >= container.tamanho)
             throw SemanticError("Índice fora dos limites da lista: ${indice.valor}")
         return container.elementos[indice.valor]
     }
@@ -806,6 +779,7 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
 
     override fun visitPrimario(ctx: PrimarioContext): Valor {
         return when {
+            ctx.text == "nulo" -> Valor.Nulo
             ctx.listaLiteral() != null -> visit(ctx.listaLiteral())
             ctx.mapaLiteral() != null -> visit(ctx.mapaLiteral())
             ctx.NUMERO() != null -> ctx.NUMERO().text.let {
@@ -815,13 +789,13 @@ class Interpretador : PortugolPPBaseVisitor<Valor>() {
             }
             ctx.TEXTO_LITERAL() != null -> Valor.Texto(ctx.TEXTO_LITERAL().text.removeSurrounding("\""))
             ctx.ID() != null && !ctx.text.startsWith("novo") -> resolverIdPrimario(ctx);
-            ctx.expressao() != null -> visit(ctx.expressao())
             ctx.text == "verdadeiro" -> Valor.Logico(true)
             ctx.text == "falso" -> Valor.Logico(false)
             ctx.text == "este" -> ambiente.thisObjeto ?: throw SemanticError("'este' fora de contexto de objeto")
             ctx.text.startsWith("novo") -> resolverClassePrimario(ctx)
+            ctx.expressao() != null -> visit(ctx.expressao())
             else -> {
-                Valor.Nulo
+                throw SemanticError("Tipo primario invalido")
             }
         }
     }

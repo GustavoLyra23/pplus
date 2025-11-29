@@ -175,14 +175,14 @@ primario
     | 'este'
     | '(' expressao ')'
     | 'novo' ID '(' argumentos? ')'
+    | 'nulo'
     | listaLiteral
     | mapaLiteral
     ;
 
 listaLiteral
-    : '[' ']'
+    : '[' NUMERO ']'
     ;
-
 mapaLiteral
     : '[[' ']' ']'
     ;

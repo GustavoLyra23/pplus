@@ -1,5 +1,6 @@
 package models
 
+import models.errors.MemoryError
 import org.gustavolyra.portugolpp.PortugolPPParser
 
 class Ambiente(val enclosing: Ambiente? = null) {
@@ -56,24 +57,18 @@ class Ambiente(val enclosing: Ambiente? = null) {
     }
 
     fun obter(nome: String): Valor {
+        if (nome == "nulo") return Valor.Nulo
         if (nome == "this" && thisObjeto != null) return thisObjeto!!
+        //TODO: refatorar...
         val valor = valores[nome]
-        if (valor != null) {
-            return valor
-        }
-
+        if (valor != null) return valor
         if (thisObjeto != null) {
             val campoValor = thisObjeto!!.campos[nome]
-            if (campoValor != null) {
-                return campoValor
-            }
+            if (campoValor != null) return campoValor
         }
-
         val externoValor = enclosing?.obter(nome)
-        if (externoValor != null && externoValor != Valor.Nulo) {
-            return externoValor
-        }
-        return Valor.Nulo
+        if (externoValor != null && externoValor != Valor.Nulo) return externoValor
+        throw MemoryError("Nao foi possivel achar a variavel")
     }
 
     fun definirClasse(nome: String, declaracao: PortugolPPParser.DeclaracaoClasseContext?) {
